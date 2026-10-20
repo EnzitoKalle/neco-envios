@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neco Envíos | Envíos locales en Necochea & Quequén</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b6e5a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="NecoEnvíos">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+tailwind.config = { theme: { extend: {
+  fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+  colors: { brand: { 50:'#ecfaf5',100:'#d1f2e8',200:'#a3e4d0',300:'#6fd0b5',400:'#34b89a',500:'#12896f',600:'#0b6e5a',700:'#09574a' } }
+}}}
+</script>
+<style>
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b;overflow-x:hidden}
+.clean-nav{background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-bottom:1px solid #e2e8f0}
+.clean-card{background:#fff;border:1px solid #e2e8f0;box-shadow:0 2px 12px -2px rgba(0,0,0,.04);transition:all .2s ease-in-out}
+.clean-card:hover{border-color:#a3e4d0;box-shadow:0 8px 20px -4px rgba(0,0,0,.08)}
+.clean-modal{background:#fff;border:1px solid #e2e8f0;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
+.clean-input{background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a}
+.clean-input:focus{border-color:#12896f;background:#fff;box-shadow:0 0 0 3px rgba(18,137,111,.15);outline:none}
+.custom-scrollbar::-webkit-scrollbar{display:none}.custom-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+@keyframes toastSlide{0%{transform:translateY(100px);opacity:0}100%{transform:translateY(0);opacity:1}}
+.toast-animate{animation:toastSlide .3s cubic-bezier(.16,1,.3,1) forwards}
+@media(max-width:640px){.modal-bottom-sheet{align-items:flex-end!important;padding:0!important}
+.modal-bottom-sheet>div{border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;max-height:88vh!important}}
+#mapa{height:260px;border-radius:1rem;z-index:0}
+.suger{max-height:170px;overflow-y:auto}
+</style>
+</head>
+<body class="antialiased pb-28 min-h-screen selection:bg-brand-500 selection:text-white">
+
+<div id="toast" class="fixed bottom-6 right-6 z-[60] hidden max-w-sm w-full px-4">
+  <div class="bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 toast-animate">
+    <div class="w-10 h-10 rounded-xl bg-brand-400/20 text-brand-300 flex items-center justify-center flex-shrink-0"><i data-lucide="check-circle-2" class="w-6 h-6"></i></div>
+    <p class="text-sm text-slate-100 flex-1 min-w-0" id="toast-txt"></p>
+  </div>
+</div>
+
+<header class="clean-nav sticky top-0 z-40 shadow-sm">
+  <div class="max-w-2xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-1.5">
+    <div class="flex items-center gap-1.5 cursor-pointer group" onclick="irInicio()">
+      <div class="w-9 h-9 bg-gradient-to-tr from-brand-700 via-brand-500 to-brand-300 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-md group-hover:scale-105 transition">N</div>
+      <div>
+        <h1 class="text-sm sm:text-lg font-black tracking-tight leading-none text-slate-900">Neco<span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400">Envíos</span></h1>
+        <p class="text-[8px] text-slate-400 font-extrabold tracking-widest uppercase mt-0.5">Envíos locales</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button onclick="abrirMisPedidos()" type="button" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 p-2 rounded-xl active:scale-95 shadow-sm" title="Mis pedidos"><i data-lucide="history" class="w-4 h-4 text-brand-500"></i></button>
+      <button id="btn-google" onclick="loginGoogle()" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1.5 active:scale-95 shadow-sm">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+        <span id="lbl-google" class="hidden sm:inline">Ingresar</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 pt-5">
+
+  <!-- INICIO -->
+  <section id="v-inicio" class="space-y-4">
+    <div class="text-center pt-2 pb-1">
+      <h2 class="text-2xl font-black text-slate-900">¿Qué necesitás hoy?</h2>
+      <p class="text-sm text-slate-500 mt-1">Repartidores de Necochea y Quequén, a tu precio y en tiempo real.</p>
+    </div>
+    <button onclick="irCliente()" type="button" class="clean-card w-full rounded-3xl p-6 text-left flex items-center gap-4 active:scale-[.98]">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-400 text-white flex items-center justify-center shadow-md"><i data-lucide="package" class="w-7 h-7"></i></div>
+      <div class="flex-1"><h3 class="font-black text-lg text-slate-900">Solicitar envío</h3><p class="text-xs text-slate-500">Retiramos en un lugar y lo llevamos a otro.</p></div>
+      <i data-lucide="arrow-right" class="w-5 h-5 text-brand-500"></i>
+    </button>
+    <button onclick="irRepartidor()" type="button" class="clean-card w-full rounded-3xl p-6 text-left flex items-center gap-4 active:scale-[.98]">
+      <div class="w-14 h-14 rounded-2xl bg-slate-900 text-brand-300 flex items-center justify-center shadow-md"><i data-lucide="bike" class="w-7 h-7"></i></div>
+      <div class="flex-1"><h3 class="font-black text-lg text-slate-900">Unirme como repartidor</h3><p class="text-xs text-slate-500">Elegí tus zonas, poné tu precio y ganá.</p></div>
+      <i data-lucide="arrow-right" class="w-5 h-5 text-brand-500"></i>
+    </button>
+  </section>
+
+  <!-- CLIENTE -->
+  <section id="v-cliente" class="hidden space-y-4">
+    <button onclick="irInicio()" type="button" class="text-xs font-bold text-brand-600 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver</button>
+    <h2 class="text-xl font-black text-slate-900">Solicitar envío</h2>
+    <div id="aviso-comercio" class="hidden bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold rounded-2xl px-4 py-3"></div>
+
+    <div class="clean-card rounded-3xl p-5 space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Tu nombre</label>
+          <input id="c-nombre" maxlength="60" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Nombre"></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Tu WhatsApp</label>
+          <input id="c-wsp" inputmode="tel" maxlength="20" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="2262 ..."></div>
+      </div>
+      <p class="text-[11px] text-slate-400">Tu número no se muestra al repartidor: hablan por el chat de la app.</p>
+    </div>
+
+    <div class="clean-card rounded-3xl p-5 space-y-3">
+      <div class="flex gap-2">
+        <button id="sel-r" onclick="setActivo('r')" type="button" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">1 · Retiro</button>
+        <button id="sel-e" onclick="setActivo('e')" type="button" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">2 · Entrega</button>
+      </div>
+      <div>
+        <input id="in-dir" maxlength="200" autocomplete="off" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí la dirección de retiro">
+        <div id="sugerencias" class="suger hidden mt-1 bg-white border border-slate-200 rounded-xl shadow-lg"></div>
+      </div>
+      <p class="text-[11px] text-slate-400">También podés tocar el mapa o arrastrar el pin para ajustar el punto exacto.</p>
+      <div id="mapa"></div>
+      <div class="grid grid-cols-2 gap-2 text-[11px]">
+        <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Retiro</b><p id="res-r" class="text-slate-600 break-words">Sin elegir</p></div>
+        <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Entrega</b><p id="res-e" class="text-slate-600 break-words">Sin elegir</p></div>
+      </div>
+      <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Consultar repartidores disponibles</button>
+    </div>
+    <div id="lista-rep" class="space-y-3"></div>
+  </section>
+
+  <!-- REPARTIDOR (se completa en la Parte 2B) -->
+  <section id="v-repartidor" class="hidden"></section>
+</main>
+
+<footer class="max-w-2xl mx-auto px-4 pt-8 pb-4 text-center text-[11px] text-slate-400 space-y-1">
+  <p>NecoEnvíos · Necochea &amp; Quequén</p>
+  <p><button type="button" onclick="mostrarLegal('terminos')" class="underline hover:text-brand-600">Términos y condiciones</button> · <button type="button" onclick="mostrarLegal('privacidad')" class="underline hover:text-brand-600">Política de privacidad</button></p>
+</footer>
+
+<!-- MODAL: CHAT / PEDIDO -->
+<div id="modal-chat" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+  <div class="clean-modal rounded-3xl p-5 w-full max-w-md flex flex-col gap-3 max-h-[90vh] text-slate-800">
+    <div class="flex justify-between items-start">
+      <div class="min-w-0"><h3 class="text-base font-black text-slate-900">Tu pedido</h3><span id="ch-estado" class="inline-block mt-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-brand-100 text-brand-700"></span></div>
+      <button onclick="cerrarChat()" type="button" class="p-1 rounded-full text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div id="ch-info" class="text-[11px] text-slate-500 space-y-0.5"></div>
+    <div id="ch-msgs" class="custom-scrollbar flex-1 min-h-[180px] max-h-[40vh] overflow-y-auto bg-slate-50 rounded-2xl p-3 space-y-2"></div>
+    <div id="ch-acciones" class="space-y-2"></div>
+    <div id="ch-form" class="flex gap-2">
+      <input id="ch-input" maxlength="1000" class="clean-input flex-1 rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí un mensaje...">
+      <button onclick="enviarMsg()" type="button" class="bg-brand-600 text-white rounded-xl px-4 active:scale-95"><i data-lucide="send" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MIS PEDIDOS -->
+<div id="modal-pedidos" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+  <div class="clean-modal rounded-3xl p-5 w-full max-w-md space-y-3 max-h-[88vh] overflow-y-auto">
+    <div class="flex justify-between items-center"><h3 class="text-base font-black text-slate-900">Mis pedidos</h3>
+      <button onclick="cerrarModal('modal-pedidos')" type="button" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+    <div id="lista-pedidos" class="space-y-2"></div>
+    <p class="text-[11px] text-slate-400">Para no perder tu historial si cambiás de teléfono, tocá "Ingresar" y vinculá tu cuenta de Google.</p>
+  </div>
+</div>
+
+<!-- MODAL: LEGAL -->
+<div id="modal-legal" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+  <div class="clean-modal rounded-3xl p-6 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-start"><h3 id="legal-titulo" class="text-lg font-black text-slate-900"></h3>
+      <button onclick="cerrarModal('modal-legal')" type="button" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+    <div id="legal-texto" class="text-xs text-slate-600 leading-relaxed space-y-2"></div>
+  </div>
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const SUPABASE_URL = "https://itpkfuprqihmclsqjfki.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_sW8WBd-hoa155VOla5xj8A__0X494yO"; // clave pública (segura de exponer, la protege el RLS)
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const EMAIL_ADMIN = "enzitohkallepremium@gmail.com"; // solo para mostrar el botón; la seguridad real está en la base
+
+/* ============ UTILIDADES ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => '$' + Number(n).toLocaleString('es-AR');
+const ico = () => { try { lucide.createIcons(); } catch(e){} };
+let toastT;
+function mostrarToast(m){ $('toast-txt').textContent = m; $('toast').classList.remove('hidden'); clearTimeout(toastT); toastT = setTimeout(()=>$('toast').classList.add('hidden'), 3500); }
+function abrirModal(id){ $(id).classList.remove('hidden'); ico(); }
+function cerrarModal(id){ $(id).classList.add('hidden'); }
+function vista(v){ ['inicio','cliente','repartidor'].forEach(x => $('v-'+x).classList.toggle('hidden', x!==v)); window.scrollTo(0,0); }
+function irInicio(){ vista('inicio'); }
+const ESTADOS = { solicitado:'Esperando al repartidor', aceptado:'Pedido aceptado', en_camino_retiro:'En camino al retiro', retirado:'Retirado, en camino a la entrega', entregado:'Entregado', cancelado:'Cancelado', rechazado:'Rechazado', vencido:'Vencido' };
+const CANCELABLES = ['solicitado','aceptado','en_camino_retiro'];
+const ABIERTOS = ['solicitado','aceptado','en_camino_retiro','retirado'];
+
+/* ============ SESIÓN (anónima por defecto, Google opcional) ============ */
+let sesion = null;
+async function asegurarSesion(){
+  let { data } = await _sb.auth.getSession();
+  if (!data.session) {
+    const r = await _sb.auth.signInAnonymously();
+    if (r.error) { mostrarToast('No pudimos iniciar sesión: ' + r.error.message); throw r.error; }
+    data = r.data;
+  }
+  sesion = data.session; pintarLogin(); return sesion;
+}
+const esAnon = () => !!(sesion && sesion.user && sesion.user.is_anonymous);
+function pintarLogin(){ $('lbl-google').textContent = (sesion && !esAnon()) ? 'Cuenta ✓' : 'Ingresar'; }
+async function loginGoogle(){
+  if (sesion && !esAnon()) { mostrarToast('Ya estás con tu cuenta de Google'); return; }
+  let r;
+  if (esAnon()) r = await _sb.auth.linkIdentity({ provider:'google', options:{ redirectTo: location.origin } });
+  if (!esAnon() || (r && r.error)) r = await _sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin } });
+  if (r && r.error) mostrarToast('Error: ' + r.error.message);
+}
+_sb.auth.onAuthStateChange((_e, s) => { if (s) { sesion = s; pintarLogin(); } });
+
+/* ============ ZONAS + MAPA ============ */
+let zonas = [], mapa, capaZonas, activo = 'r';
+const pts = { r:null, e:null }, marks = { r:null, e:null };
+function rgbaOk(c){ return /^rgba?\([\d\s.,]+\)$/.test(c||'') ? c : '#12896f'; }
+function enPoligono(lat, lng, geo){
+  const ring = geo.coordinates[0]; let dentro = false;
+  for (let i=0,j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if (((yi>lat)!==(yj>lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi)) dentro = !dentro;
+  }
+  return dentro;
+}
+function zonaDe(lat, lng){ const z = zonas.find(z => enPoligono(lat, lng, z.geojson)); return z ? z.nombre : null; }
+async function cargarZonas(){
+  const { data, error } = await _sb.from('ne_zonas').select('id,nombre,color,orden,geojson').order('orden');
+  if (error) { mostrarToast('No se pudieron cargar las zonas'); return; }
+  zonas = data || [];
+}
+function iniciarMapa(){
+  if (mapa) { setTimeout(()=>mapa.invalidateSize(), 100); return; }
+  mapa = L.map('mapa').setView([-38.56, -58.74], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(mapa);
+  capaZonas = L.layerGroup().addTo(mapa);
+  zonas.forEach(z => L.geoJSON(z.geojson, { style:{ color:rgbaOk(z.color), weight:1.5, fillOpacity:.12 } }).bindTooltip(z.nombre, {sticky:true}).addTo(capaZonas));
+  mapa.on('click', e => ponerPunto(activo, e.latlng.lat, e.latlng.lng, null, true));
+}
+function setActivo(k){
+  activo = k;
+  $('sel-r').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='r' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
+  $('sel-e').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='e' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
+  $('in-dir').placeholder = k==='r' ? 'Escribí la dirección de retiro' : 'Escribí la dirección de entrega';
+  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden');
+}
+function pintarResumen(){
+  ['r','e'].forEach(k => {
+    const p = pts[k]; const z = p ? zonaDe(p.lat, p.lng) : null;
+    $('res-'+k).textContent = !p ? 'Sin elegir' : (p.dir.slice(0,60) + (z ? ' · ' + z : ' · ⚠ fuera de zona'));
+  });
+}
+async function ponerPunto(k, lat, lng, dir, reverse){
+  pts[k] = { lat, lng, dir: dir || (pts[k] ? pts[k].dir : '') || 'Punto en el mapa' };
+  const color = k==='r' ? '#0b6e5a' : '#f59e0b';
+  if (!marks[k]) {
+    marks[k] = L.marker([lat,lng], { draggable:true, icon:L.divIcon({ className:'', html:`<div style="background:${color};color:#fff;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"><b style="transform:rotate(45deg);font-size:12px">${k==='r'?'R':'E'}</b></div>`, iconSize:[28,28], iconAnchor:[14,28] }) }).addTo(mapa);
+    marks[k].on('dragend', e => { const p = e.target.getLatLng(); ponerPunto(k, p.lat, p.lng, null, true); });
+  } else marks[k].setLatLng([lat,lng]);
+  if (k===activo) $('in-dir').value = pts[k].dir;
+  pintarResumen();
+  if (reverse) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lng=${lng}&lon=${lng}&accept-language=es`);
+      const j = await r.json();
+      if (j && j.display_name && pts[k] && pts[k].lat===lat && pts[k].lng===lng) {
+        pts[k].dir = j.display_name.split(',').slice(0,3).join(',').trim();
+        if (k===activo) $('in-dir').value = pts[k].dir; pintarResumen();
+      }
+    } catch(e){}
+  }
+}
+let sugT;
+async function buscarDir(q){
+  const box = $('sugerencias');
+  if (q.trim().length < 4) { box.classList.add('hidden'); return; }
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(q)}`;
+    const j = await (await fetch(url)).json();
+    box.innerHTML = '';
+    if (!j.length) { box.innerHTML = '<p class="p-3 text-xs text-slate-400">Sin resultados. Probá tocar el mapa.</p>'; box.classList.remove('hidden'); return; }
+    j.forEach(it => {
+      const b = document.createElement('button'); b.type = 'button';
+      b.className = 'block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-brand-50 border-b border-slate-100 last:border-0';
+      b.textContent = it.display_name.split(',').slice(0,3).join(',');
+      b.onclick = () => { const lat = +it.lat, lng = +it.lon; box.classList.add('hidden'); ponerPunto(activo, lat, lng, b.textContent, false); mapa.setView([lat,lng], 16); };
+      box.appendChild(b);
+    });
+    box.classList.remove('hidden');
+  } catch(e){ box.classList.add('hidden'); }
+}
+
+/* ============ FLUJO CLIENTE ============ */
+let paramsAplicados = false, comercioParam = '';
+async function irCliente(){
+  vista('cliente');
+  try { await asegurarSesion(); } catch(e){ return; }
+  if (!zonas.length) await cargarZonas();
+  iniciarMapa(); ico();
+  $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
+  $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
+  if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
+}
+async function geocodificar(q){
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(q)}`;
+  const j = await (await fetch(url)).json(); return j[0] || null;
+}
+async function aplicarParams(){
+  const sp = new URLSearchParams(location.search);
+  const ret = (sp.get('retiro')||'').slice(0,200), ent = (sp.get('entrega')||'').slice(0,200);
+  comercioParam = (sp.get('comercio')||'').slice(0,80);
+  if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
+  for (const [k, q] of [['r', ret], ['e', ent]]) {
+    if (!q) continue;
+    try { const g = await geocodificar(q); if (g) await ponerPunto(k, +g.lat, +g.lon, q, false); else { pts[k] = null; } } catch(e){}
+    if (!pts[k]) { $('res-'+k).textContent = q + ' (marcalo en el mapa)'; }
+  }
+  if (ret) setActivo('r');
+  const f = pts.r || pts.e; if (f) mapa.setView([f.lat, f.lng], 14);
+}
+async function consultar(){
+  const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
+  if (nombre.length < 2) return mostrarToast('Poné tu nombre');
+  if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Poné tu WhatsApp');
+  if (!pts.r || !pts.e) return mostrarToast('Elegí retiro y entrega');
+  if (!zonaDe(pts.r.lat, pts.r.lng)) return mostrarToast('El retiro está fuera de nuestras zonas');
+  if (!zonaDe(pts.e.lat, pts.e.lng)) return mostrarToast('La entrega está fuera de nuestras zonas');
+  localStorage.setItem('ne_nombre', nombre); localStorage.setItem('ne_wsp', wsp);
+  const btn = $('btn-consultar'); btn.disabled = true;
+  try {
+    await asegurarSesion();
+    const { data, error } = await _sb.rpc('ne_listar_repartidores', { r_lat:pts.r.lat, r_lng:pts.r.lng, e_lat:pts.e.lat, e_lng:pts.e.lng });
+    if (error) throw error;
+    pintarRepartidores(data || []);
+  } catch(e){ mostrarToast('Error: ' + (e.message || e)); }
+  btn.disabled = false;
+}
+const VEH = { moto:'🏍️ Moto', bici:'🚲 Bici', auto:'🚗 Auto' };
+function pintarRepartidores(lista){
+  const box = $('lista-rep'); box.innerHTML = '';
+  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">Ahora no hay repartidores disponibles para ese recorrido. Probá en unos minutos.</div>'; return; }
+  lista.forEach(r => {
+    const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
+    const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
+    d.innerHTML = `<img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
+      <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>
+      <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo]||r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p></div>
+      <div class="text-right"><p class="font-black text-lg text-brand-600">${money(r.precio)}</p>
+      <button type="button" class="mt-1 bg-brand-600 text-white text-xs font-black px-3 py-1.5 rounded-xl active:scale-95">Solicitar</button></div>`;
+    d.querySelector('button').onclick = ev => solicitar(r, ev.currentTarget);
+    box.appendChild(d);
+  });
+}
+async function solicitar(r, btn){
+  btn.disabled = true;
+  try {
+    const { data, error } = await _sb.rpc('ne_crear_pedido', {
+      p_rep:r.repartidor_id, p_nombre:$('c-nombre').value.trim(), p_whatsapp:$('c-wsp').value.trim(), p_comercio:comercioParam,
+      r_dir:pts.r.dir, r_lat:pts.r.lat, r_lng:pts.r.lng, e_dir:pts.e.dir, e_lat:pts.e.lat, e_lng:pts.e.lng });
+    if (error) throw error;
+    $('lista-rep').innerHTML = ''; abrirChat(data);
+  } catch(e){ mostrarToast(e.message || 'No se pudo solicitar'); btn.disabled = false; consultar(); }
+}
+
+/* ============ CHAT DEL PEDIDO ============ */
+let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0;
+async function abrirChat(id){
+  chatId = id; ultimoMsg = 0; $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
+  await refrescarPedido(); await cargarMensajes();
+  if (chatCanal) _sb.removeChannel(chatCanal);
+  chatCanal = _sb.channel('ped-' + id)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ne_mensajes', filter:'pedido_id=eq.' + id }, () => cargarMensajes())
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'ne_pedidos', filter:'id=eq.' + id }, () => refrescarPedido())
+    .subscribe();
+  clearInterval(chatPoll);
+  chatPoll = setInterval(async () => { await _sb.rpc('ne_vencer'); await refrescarPedido(); await cargarMensajes(); }, 6000); // respaldo
+}
+function cerrarChat(){ cerrarModal('modal-chat'); clearInterval(chatPoll); if (chatCanal) { _sb.removeChannel(chatCanal); chatCanal = null; } chatId = null; }
+async function refrescarPedido(){
+  if (!chatId) return;
+  const { data } = await _sb.from('ne_pedidos').select('*').eq('id', chatId).single();
+  if (!data) return; chatPedido = data;
+  $('ch-estado').textContent = ESTADOS[data.estado] || data.estado;
+  $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(data.retiro_dir)}</p><p>🏁 Entrega: ${esc(data.entrega_dir)}</p><p>💵 ${sesion && data.cliente_id === sesion.user.id ? 'Total a pagar al repartidor' : 'Total a cobrar al cliente'}: <b>${money(data.precio)}</b> (efectivo o transferencia)</p>`;
+  const ac = $('ch-acciones'); ac.innerHTML = '';
+  const esCli = sesion && data.cliente_id === sesion.user.id;
+  if (esCli && CANCELABLES.includes(data.estado)) {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'w-full bg-rose-50 border border-rose-200 text-rose-600 text-xs font-black rounded-xl py-2.5 active:scale-95'; b.textContent = 'Cancelar pedido';
+    b.onclick = async () => { if (!confirm('¿Cancelar el pedido?')) return; const { error } = await _sb.rpc('ne_cancelar', { p_pedido: chatId }); if (error) mostrarToast(error.message); else refrescarPedido(); };
+    ac.appendChild(b);
+  }
+  if (esCli && data.estado === 'entregado' && !data.calificacion) {
+    const w = document.createElement('div'); w.className = 'text-center';
+    w.innerHTML = '<p class="text-xs font-bold text-slate-600 mb-1">¿Cómo estuvo el envío?</p>';
+    for (let i=1;i<=5;i++){ const s = document.createElement('button'); s.type='button'; s.className='text-3xl px-0.5'; s.textContent='⭐';
+      s.onclick = async () => { const { error } = await _sb.rpc('ne_calificar', { p_pedido: chatId, p_estrellas: i }); if (error) mostrarToast(error.message); else { mostrarToast('¡Gracias por calificar!'); refrescarPedido(); } };
+      w.appendChild(s); }
+    ac.appendChild(w);
+  }
+  if (data.calificacion) ac.innerHTML = `<p class="text-center text-xs text-slate-500">Calificación: ${'⭐'.repeat(data.calificacion)}</p>`;
+  $('ch-form').classList.toggle('hidden', !ABIERTOS.includes(data.estado));
+}
+async function cargarMensajes(){
+  if (!chatId) return;
+  const { data } = await _sb.from('ne_mensajes').select('id,autor_id,tipo,texto,creado').eq('pedido_id', chatId).order('id');
+  if (!data) return;
+  const nuevo = data.length ? data[data.length-1].id : 0;
+  if (nuevo === ultimoMsg) return; ultimoMsg = nuevo;
+  const box = $('ch-msgs'); box.innerHTML = '';
+  const yo = sesion && sesion.user.id;
+  data.forEach(m => {
+    const d = document.createElement('div');
+    if (m.tipo === 'sistema') { d.className = 'text-center text-[11px] font-bold text-brand-700 bg-brand-50 rounded-xl px-3 py-1.5'; }
+    else d.className = 'max-w-[80%] text-sm rounded-2xl px-3 py-2 break-words ' + (m.autor_id === yo ? 'ml-auto bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-800');
+    d.textContent = m.texto; // textContent = sin riesgo de XSS
+    box.appendChild(d);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+async function enviarMsg(){
+  const t = $('ch-input').value.trim(); if (!t || !chatId) return;
+  $('ch-input').value = '';
+  const { error } = await _sb.from('ne_mensajes').insert({ pedido_id: chatId, autor_id: sesion.user.id, tipo:'texto', texto: t.slice(0,1000) });
+  if (error) mostrarToast('No se envió: ' + error.message); else cargarMensajes();
+}
+$('ch-input').addEventListener('keydown', e => { if (e.key === 'Enter') enviarMsg(); });
+
+/* ============ MIS PEDIDOS ============ */
+async function abrirMisPedidos(){
+  abrirModal('modal-pedidos'); const box = $('lista-pedidos'); box.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
+  try { await asegurarSesion(); } catch(e){ return; }
+  const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,retiro_dir,entrega_dir,creado').eq('cliente_id', sesion.user.id).order('creado', { ascending:false }).limit(30);
+  if (error) { box.textContent = 'Error al cargar'; return; }
+  if (!data.length) { box.innerHTML = '<p class="text-xs text-slate-400">Todavía no hiciste pedidos.</p>'; return; }
+  box.innerHTML = '';
+  data.forEach(p => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'clean-card w-full rounded-2xl p-3 text-left';
+    b.innerHTML = `<div class="flex justify-between text-xs"><b class="text-brand-700">${esc(ESTADOS[p.estado]||p.estado)}</b><b>${money(p.precio)}</b></div>
+      <p class="text-[11px] text-slate-500 truncate">${esc(p.retiro_dir)} → ${esc(p.entrega_dir)}</p>
+      <p class="text-[10px] text-slate-400">${new Date(p.creado).toLocaleString('es-AR')}</p>`;
+    b.onclick = () => { cerrarModal('modal-pedidos'); abrirChat(p.id); };
+    box.appendChild(b);
+  });
+}
+
+/* ============ LEGAL ============ */
+const LEGAL = {
+  terminos: ['Términos y condiciones', [
+    'NecoEnvíos conecta personas que necesitan un envío con repartidores independientes de Necochea y Quequén. No somos el transportista ni empleador de los repartidores.',
+    'El precio del envío lo fija cada repartidor y se muestra antes de solicitar. Se abona directamente al repartidor (efectivo o transferencia).',
+    'Podés cancelar un pedido mientras no haya sido retirado. Los repartidores pueden aceptar o rechazar solicitudes.',
+    'Está prohibido enviar artículos ilegales, peligrosos o prohibidos por la ley argentina. Los usuarios se comprometen a un trato respetuoso en el chat.',
+    'Podemos pausar o dar de baja cuentas que incumplan estas reglas. Estos términos se rigen por las leyes de la República Argentina.']],
+  privacidad: ['Política de privacidad', [
+    'Responsable: NecoEnvíos (Necochea, Buenos Aires). Tratamos tus datos conforme a la Ley 25.326 de Protección de Datos Personales de Argentina.',
+    'Clientes: guardamos tu nombre, tu WhatsApp, las direcciones de tus pedidos y los mensajes del chat. Tu teléfono no se muestra al repartidor.',
+    'Repartidores: guardamos nombre completo, número de documento, foto del DNI y foto de rostro para verificar identidad. La foto del DNI se guarda en un espacio privado y solo la ve el administrador. La foto de rostro se muestra a los clientes.',
+    'Usamos Supabase (base de datos y archivos) y servicios de mapas de OpenStreetMap. No vendemos tus datos.',
+    'Podés pedir acceso, rectificación o eliminación de tus datos escribiendo al administrador. La Agencia de Acceso a la Información Pública es el órgano de control de la Ley 25.326.']]
+};
+function mostrarLegal(t){
+  $('legal-titulo').textContent = LEGAL[t][0]; const box = $('legal-texto'); box.innerHTML = '';
+  LEGAL[t][1].forEach(x => { const p = document.createElement('p'); p.textContent = x; box.appendChild(p); });
+  abrirModal('modal-legal');
+}
+
+/* ============ REPARTIDOR (placeholder hasta la Parte 2B) ============ */
+function irRepartidor(){ mostrarToast('El registro de repartidores se activa con la Parte 2B'); }
+
+/* ============ ARRANQUE ============ */
+(async () => {
+  ico();
+  try { await asegurarSesion(); } catch(e){}
+  if (new URLSearchParams(location.search).has('retiro') || new URLSearchParams(location.search).has('entrega')) irCliente();
+})();
+</script>
+<script src="repartidor.js"></script>
+<script src="admin.js"></script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}</script>
+</body>
+</html>
