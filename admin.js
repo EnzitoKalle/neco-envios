@@ -141,7 +141,7 @@
     const { data, error } = await _sb.from('ne_pedidos').select('*').order('creado', { ascending: false }).limit(150);
     if (error) { $('ad-cont').textContent = error.message; return; }
     let h = `<div class="overflow-x-auto"><table class="w-full"><thead><tr><th class="${th}">Fecha</th><th class="${th}">Estado</th><th class="${th}">Repartidor</th><th class="${th}">Recorrido</th><th class="${th}">Precio</th></tr></thead><tbody>`;
-    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(p.retiro_dir)} → ${esc(p.entrega_dir)}</td><td class="${td} font-black">${money(p.precio)}</td></tr>`);
+    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</td><td class="${td} font-black">${money(p.precio)}</td></tr>`);
     $('ad-cont').innerHTML = h + '</tbody></table></div>';
   }
 })();

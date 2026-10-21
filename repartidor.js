@@ -194,7 +194,7 @@
     L.forEach(o => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 space-y-2';
       d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="text-lg text-brand-600">${money(o.precio)}</b></div>
-        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(o.retiro_dir)}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(o.entrega_dir)}</p>
+        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>
         ${o.comercio ? `<p class="text-[11px] text-slate-400">Comercio: ${esc(o.comercio)}</p>` : ''}<p class="text-[11px] text-slate-400">Cliente: ${esc(o.cliente_nombre)}</p>
         <div class="flex gap-2 pt-1" data-acc></div>`;
       const acc = d.querySelector('[data-acc]');
@@ -273,11 +273,14 @@
     const suma = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
     const tot = arr => suma(arr, x => +x.precio), com = arr => suma(arr, x => x.precio * x.comision_pct / 100);
     const dia = ent.filter(x => new Date(x.entregado_en).toDateString() === hoy), sm = ent.filter(x => new Date(x.entregado_en).getTime() > sem);
-    const fila = (t, a) => `<div class="flex justify-between text-xs py-1.5 border-b border-slate-100 last:border-0"><span class="font-bold">${t}</span><span>${a.length} envíos · cobrado ${money(Math.round(tot(a)))} · comisión ${money(Math.round(com(a)))} · <b class="text-brand-600">te quedan ${money(Math.round(tot(a) - com(a)))}</b></span></div>`;
-    c.innerHTML = card(`<p class="font-black">Tus ganancias</p>${fila('Hoy', dia)}${fila('Últimos 7 días', sm)}${fila('Total', ent)}
+    const bloque = (t, a) => { const T = Math.round(tot(a)), C = Math.round(com(a)); const k = (v, l) => `<div><p class="text-base font-black text-slate-900">${v}</p><p class="text-[10px] text-slate-500">${l}</p></div>`;
+      return `<div class="rounded-2xl bg-slate-50 p-3"><p class="text-[11px] font-extrabold text-slate-400 uppercase mb-2">${t}</p>
+        <div class="grid grid-cols-3 gap-2 text-center">${k(a.length, 'Envíos')}${k(money(T), 'Cobrado')}${k(money(C), 'Comisión')}</div>
+        <div class="mt-2 pt-2 border-t border-slate-200 flex justify-between items-center"><span class="text-xs font-bold text-slate-600">Te quedan</span><span class="text-xl font-black text-brand-600">${money(T - C)}</span></div></div>`; };
+    c.innerHTML = card(`<p class="font-black">Tus ganancias</p>${bloque('Hoy', dia)}${bloque('Últimos 7 días', sm)}${bloque('Total', ent)}
       <p class="text-[11px] text-slate-400">La comisión se la pagás al administrador cada semana.</p>`) + '<div id="h-lista" class="space-y-2 mt-3"></div>';
     data.forEach(x => { const d = document.createElement('div'); d.className = 'clean-card rounded-2xl p-3 text-xs';
-      d.innerHTML = `<div class="flex justify-between"><b class="${x.estado === 'entregado' ? 'text-brand-700' : 'text-rose-600'}">${esc(ESTADOS[x.estado])}</b><b>${money(x.precio)}</b></div><p class="text-slate-500 truncate">${esc(x.retiro_dir)} → ${esc(x.entrega_dir)}</p><p class="text-[10px] text-slate-400">${new Date(x.creado).toLocaleString('es-AR')}</p>`;
+      d.innerHTML = `<div class="flex justify-between"><b class="${x.estado === 'entregado' ? 'text-brand-700' : 'text-rose-600'}">${esc(ESTADOS[x.estado])}</b><b>${money(x.precio)}</b></div><p class="text-slate-500 truncate">${esc(fixDir(x.retiro_dir))} → ${esc(fixDir(x.entrega_dir))}</p><p class="text-[10px] text-slate-400">${new Date(x.creado).toLocaleString('es-AR')}</p>`;
       $('h-lista').appendChild(d); });
   }
 
