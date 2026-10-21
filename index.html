@@ -111,7 +111,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
         <button id="sel-e" onclick="setActivo('e')" type="button" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">2 · Entrega</button>
       </div>
       <div>
-        <input id="in-dir" maxlength="200" autocomplete="off" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí la dirección de retiro">
+        <div class="flex gap-2"><input id="in-dir" maxlength="200" autocomplete="off" class="clean-input flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí la dirección de retiro">
+          <button id="btn-buscar" type="button" title="Ubicar dirección" class="bg-brand-600 text-white rounded-xl px-3.5 active:scale-95"><i data-lucide="search" class="w-4 h-4"></i></button></div>
+        <p id="dir-est" class="text-[11px] text-amber-600 font-bold mt-1"></p>
         <div id="sugerencias" class="suger hidden mt-1 bg-white border border-slate-200 rounded-xl shadow-lg"></div>
       </div>
       <p class="text-[11px] text-slate-400">También podés tocar el mapa o arrastrar el pin para ajustar el punto exacto.</p>
@@ -245,7 +247,7 @@ function setActivo(k){
   $('sel-r').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='r' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
   $('sel-e').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='e' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
   $('in-dir').placeholder = k==='r' ? 'Escribí la dirección de retiro' : 'Escribí la dirección de entrega';
-  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden');
+  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden'); $('dir-est').textContent = ''; clearTimeout(sugT); busqId++;
 }
 function pintarResumen(){
   ['r','e'].forEach(k => {
@@ -253,24 +255,37 @@ function pintarResumen(){
     $('res-'+k).textContent = !p ? 'Sin elegir' : (p.dir.slice(0,60) + (z ? ' · ' + z : ' · ⚠ fuera de zona'));
   });
 }
+// Cola para Nominatim (el servicio gratuito pide 1 consulta por segundo): evita bloqueos al hacer varias cosas juntas
+let nomQ = Promise.resolve();
+function nom(url){
+  const p = nomQ.then(async () => {
+    for (let n = 0; n < 2; n++) {
+      try { const r = await fetch(url); if (r.ok) return await r.json(); } catch (e) {}
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    return null;
+  });
+  nomQ = p.then(() => new Promise(r => setTimeout(r, 1100)), () => new Promise(r => setTimeout(r, 1100)));
+  return p;
+}
+const BUSCANDO = 'Buscando dirección…';
 async function ponerPunto(k, lat, lng, dir, reverse){
-  pts[k] = { lat, lng, dir: dir || (pts[k] ? pts[k].dir : '') || 'Punto en el mapa' };
+  pts[k] = { lat, lng, dir: dir || BUSCANDO };
   const color = k==='r' ? '#0b6e5a' : '#f59e0b';
   if (!marks[k]) {
     marks[k] = L.marker([lat,lng], { draggable:true, icon:L.divIcon({ className:'', html:`<div style="background:${color};color:#fff;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"><b style="transform:rotate(45deg);font-size:12px">${k==='r'?'R':'E'}</b></div>`, iconSize:[28,28], iconAnchor:[14,28] }) }).addTo(mapa);
     marks[k].on('dragend', e => { const p = e.target.getLatLng(); ponerPunto(k, p.lat, p.lng, null, true); });
   } else marks[k].setLatLng([lat,lng]);
-  if (k===activo) $('in-dir').value = pts[k].dir;
+  if (k===activo) { $('in-dir').value = pts[k].dir; $('dir-est').textContent = ''; }
   pintarResumen();
   if (reverse) {
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lng=${lng}&lon=${lng}&addressdetails=1&accept-language=es`);
-      const j = await r.json();
-      if (j && j.display_name && pts[k] && pts[k].lat===lat && pts[k].lng===lng) {
-        pts[k].dir = formatDir(j);
-        if (k===activo) $('in-dir').value = pts[k].dir; pintarResumen();
-      }
-    } catch(e){}
+    const j = await nom(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=es`);
+    if (pts[k] && pts[k].lat===lat && pts[k].lng===lng) {
+      const d = j ? formatDir(j) : '';
+      pts[k].dir = d || 'Punto en el mapa';
+      if (k===activo) $('in-dir').value = pts[k].dir;
+      pintarResumen();
+    }
   }
 }
 function fixDir(s){ return String(s||'').replace(/^\s*(\d+[a-zA-Z]?)\s*,\s*([^,]+)(.*)$/, '$2 $1$3'); }
@@ -281,45 +296,41 @@ function formatDir(it){
   if (calle) { let d = calle + (a.house_number ? ' ' + a.house_number : ''); if (barrio && barrio !== calle) d += ', ' + barrio; return d; }
   return fixDir((it.display_name || '').split(',').slice(0,3).join(',').trim());
 }
-let sugT;
-async function buscarDir(q){
-  const box = $('sugerencias');
-  if (q.trim().length < 4) { box.classList.add('hidden'); return; }
-  try {
-    const qq = /necochea|quequ/i.test(q) ? q : q + ', Necochea';
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
-    const j = await (await fetch(url)).json();
-    box.innerHTML = '';
-    if (!j.length) { box.innerHTML = '<p class="p-3 text-xs text-slate-400">Sin resultados. Probá tocar el mapa.</p>'; box.classList.remove('hidden'); return; }
-    j.forEach(it => {
-      const b = document.createElement('button'); b.type = 'button';
-      b.className = 'block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-brand-50 border-b border-slate-100 last:border-0';
-      b.textContent = formatDir(it);
-      b.onclick = () => { const lat = +it.lat, lng = +it.lon; box.classList.add('hidden'); ponerPunto(activo, lat, lng, b.textContent, false); mapa.setView([lat,lng], 16); };
-      box.appendChild(b);
-    });
-    box.classList.remove('hidden');
-  } catch(e){ box.classList.add('hidden'); }
-}
-
-$('in-dir').addEventListener('input', e => { clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q), 600); });
-$('in-dir').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const f = $('sugerencias').querySelector('button'); if (f) f.click(); } });
-
-/* ============ FLUJO CLIENTE ============ */
-let paramsAplicados = false, comercioParam = '';
-async function irCliente(){
-  vista('cliente');
-  try { await asegurarSesion(); } catch(e){ return; }
-  if (!zonas.length) await cargarZonas();
-  iniciarMapa(); ico();
-  $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
-  $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
-  if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
-}
-async function geocodificar(q){
+function urlBusqueda(q, limite){
   const qq = /necochea|quequ/i.test(q) ? q : q + ', Necochea';
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
-  const j = await (await fetch(url)).json(); return j[0] || null;
+  return `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${limite}&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
+}
+function elegirResultado(it){
+  const lat = +it.lat, lng = +it.lon;
+  $('sugerencias').classList.add('hidden'); $('dir-est').textContent = '';
+  ponerPunto(activo, lat, lng, formatDir(it), false); mapa.setView([lat,lng], 16);
+}
+let sugT, busqId = 0;
+// directo = true: toma el primer resultado y ubica el pin sin pedir que elijas (Enter o lupa)
+async function buscarDir(q, directo){
+  const box = $('sugerencias'), est = $('dir-est');
+  if (q.trim().length < 4) { box.classList.add('hidden'); est.textContent = ''; return; }
+  const mi = ++busqId; est.textContent = 'Buscando…';
+  const j = await nom(urlBusqueda(q, 5));
+  if (mi !== busqId) return;                       // llegó una búsqueda más nueva: descarto esta
+  box.innerHTML = '';
+  if (j === null) { est.textContent = 'No pudimos buscar ahora. Tocá el mapa para marcar el punto.'; box.classList.add('hidden'); return; }
+  if (!j.length) { est.textContent = 'No encontramos esa dirección. Probá sin la altura o tocá el mapa.'; box.classList.add('hidden'); return; }
+  est.textContent = '';
+  if (directo) { elegirResultado(j[0]); return; }
+  j.forEach(it => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-brand-50 border-b border-slate-100 last:border-0';
+    b.textContent = formatDir(it); b.onclick = () => elegirResultado(it); box.appendChild(b);
+  });
+  box.classList.remove('hidden');
+}
+$('in-dir').addEventListener('input', e => { clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q, false), 700); });
+$('in-dir').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sugT); buscarDir($('in-dir').value, true); } });
+$('btn-buscar').addEventListener('click', () => { clearTimeout(sugT); buscarDir($('in-dir').value, true); });
+
+async function geocodificar(q){
+  const j = await nom(urlBusqueda(q, 1)); return (j && j[0]) || null;
 }
 async function aplicarParams(){
   const sp = new URLSearchParams(location.search);
@@ -338,6 +349,9 @@ async function consultar(){
   const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
   if (nombre.length < 2) return mostrarToast('Poné tu nombre');
   if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Poné tu WhatsApp');
+  const txt = $('in-dir').value.trim(), cur = pts[activo];
+  if (txt && (!cur || cur.dir !== txt)) return mostrarToast('Tocá la lupa 🔍 (o elegí una opción) para ubicar la dirección que escribiste');
+  if ((pts.r && pts.r.dir === BUSCANDO) || (pts.e && pts.e.dir === BUSCANDO)) return mostrarToast('Esperá un segundo, estamos buscando la dirección');
   if (!pts.r || !pts.e) return mostrarToast('Elegí retiro y entrega');
   if (!zonaDe(pts.r.lat, pts.r.lng)) return mostrarToast('El retiro está fuera de nuestras zonas');
   if (!zonaDe(pts.e.lat, pts.e.lng)) return mostrarToast('La entrega está fuera de nuestras zonas');
