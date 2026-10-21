@@ -53,7 +53,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
 <header class="clean-nav sticky top-0 z-40 shadow-sm">
   <div class="max-w-2xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-1.5">
     <div class="flex items-center gap-1.5 cursor-pointer group" onclick="irInicio()">
-      <div class="w-9 h-9 bg-gradient-to-tr from-brand-700 via-brand-500 to-brand-300 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-md group-hover:scale-105 transition">N</div>
+      <img src="icon-192.png" alt="NecoEnvíos" class="w-9 h-9 rounded-xl shadow-md group-hover:scale-105 transition">
       <div>
         <h1 class="text-sm sm:text-lg font-black tracking-tight leading-none text-slate-900">Neco<span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400">Envíos</span></h1>
         <p class="text-[8px] text-slate-400 font-extrabold tracking-widest uppercase mt-0.5">Envíos locales</p>
@@ -125,6 +125,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
         <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Retiro</b><p id="res-r" class="text-slate-600 break-words">Sin elegir</p></div>
         <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Entrega</b><p id="res-e" class="text-slate-600 break-words">Sin elegir</p></div>
       </div>
+      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Qué vehículo necesitás?</p><div id="filtro-veh" class="flex gap-1.5"><button type="button" data-v="todos" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">Cualquiera</button><button type="button" data-v="moto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🏍️ Moto</button><button type="button" data-v="auto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚗 Auto</button><button type="button" data-v="bici" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚲 Bici</button></div><p class="text-[11px] text-slate-400 mt-1">Para paquetes grandes o frágiles, elegí Auto.</p></div>
       <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Consultar repartidores disponibles</button>
     </div>
     <p id="err-sol" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3"></p>
@@ -475,9 +476,12 @@ async function consultar(){
   btn.disabled = false;
 }
 const VEH = { moto:'🏍️ Moto', bici:'🚲 Bici', auto:'🚗 Auto' };
+let filtroVeh = 'todos', ultimaLista = [];
 function pintarRepartidores(lista){
+  if (lista) ultimaLista = lista;
+  lista = ultimaLista.filter(r => filtroVeh === 'todos' || r.vehiculo === filtroVeh);
   const box = $('lista-rep'); box.innerHTML = '';
-  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">Ahora no hay repartidores disponibles para ese recorrido. Probá en unos minutos.</div>'; return; }
+  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + (ultimaLista.length ? 'No hay repartidores con ese vehículo para este recorrido ahora. Probá con «Cualquiera».' : 'Ahora no hay repartidores disponibles para ese recorrido. Probá en unos minutos.') + '</div>'; return; }
   lista.forEach(r => {
     const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
     const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
@@ -491,6 +495,11 @@ function pintarRepartidores(lista){
   });
 }
 function mostrarError(m){ const e = $('err-sol'); e.textContent = m; e.classList.remove('hidden'); e.scrollIntoView({ behavior:'smooth', block:'center' }); mostrarToast(m); }
+document.querySelectorAll('#filtro-veh [data-v]').forEach(b => b.addEventListener('click', () => {
+  filtroVeh = b.dataset.v;
+  document.querySelectorAll('#filtro-veh [data-v]').forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === filtroVeh ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
+  if (ultimaLista.length) pintarRepartidores();
+}));
 async function solicitar(r, btn){
   const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Solicitando…'; $('err-sol').classList.add('hidden');
   let id = null;

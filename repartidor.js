@@ -33,7 +33,7 @@
   /* ---------- 1. INSTALAR ---------- */
   function pInstalar() {
     root().innerHTML = volver() + card(`
-      <div class="text-center"><div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-400 text-white flex items-center justify-center text-2xl font-black shadow-md">N</div>
+      <div class="text-center"><img src="icon-192.png" alt="" class="w-16 h-16 mx-auto rounded-2xl shadow-md">
       <h2 class="text-xl font-black mt-3">Instalá la app de repartidores</h2>
       <p class="text-xs text-slate-500 mt-1">Con la app instalada recibís avisos de nuevos pedidos y funciona más rápido.</p></div>
       ${R.deferred ? btn('i-inst', 'Instalar app') : ''}
