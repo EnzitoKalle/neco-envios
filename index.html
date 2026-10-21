@@ -114,6 +114,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
         <div class="flex gap-2"><input id="in-dir" maxlength="200" autocomplete="off" class="clean-input flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí la dirección de retiro">
           <button id="btn-buscar" type="button" title="Ubicar dirección" class="bg-brand-600 text-white rounded-xl px-3.5 active:scale-95"><i data-lucide="search" class="w-4 h-4"></i></button></div>
         <p id="dir-est" class="text-[11px] text-amber-600 font-bold mt-1"></p>
+        <button id="btn-usar-texto" type="button" class="hidden mt-1 text-[11px] font-black text-brand-700 underline text-left">Usar lo que escribí como dirección (con el pin actual)</button>
         <div id="sugerencias" class="suger hidden mt-1 bg-white border border-slate-200 rounded-xl shadow-lg"></div>
       </div>
       <p class="text-[11px] text-slate-400">También podés tocar el mapa o arrastrar el pin para ajustar el punto exacto.</p>
@@ -248,9 +249,10 @@ function setActivo(k){
   $('sel-r').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='r' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
   $('sel-e').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='e' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
   $('in-dir').placeholder = k==='r' ? 'Escribí la dirección de retiro' : 'Escribí la dirección de entrega';
-  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden'); $('dir-est').textContent = ''; clearTimeout(sugT); busqId++;
+  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden'); $('dir-est').textContent = ''; clearTimeout(sugT); busqId++; revisarTexto();
 }
 function pintarResumen(){
+  revisarTexto();
   ['r','e'].forEach(k => {
     const p = pts[k]; const z = p ? zonaDe(p.lat, p.lng) : null;
     $('res-'+k).textContent = !p ? 'Sin elegir' : (p.dir.slice(0,60) + (z ? ' · ' + z : ' · ⚠ fuera de zona'));
@@ -302,9 +304,37 @@ function urlBusqueda(q, limite){
   return `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${limite}&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
 }
 function elegirResultado(it){
-  const lat = +it.lat, lng = +it.lon;
   $('sugerencias').classList.add('hidden'); $('dir-est').textContent = '';
-  ponerPunto(activo, lat, lng, formatDir(it), false); mapa.setView([lat,lng], 16);
+  ponerPunto(activo, it.lat, it.lng, it.texto, false); mapa.setView([it.lat, it.lng], 16);
+}
+/* Fuentes de direcciones: 1) Georef (datos oficiales de Argentina, con alturas)  2) OpenStreetMap como respaldo */
+function tituloCalle(c){
+  const n = String((c && c.nombre) || '').trim();
+  if (/^\d+$/.test(n)) return 'Calle ' + n;
+  return n.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+}
+async function georef(q, limite){
+  try {
+    const base = q.split(',')[0].trim();
+    const url = 'https://apis.datos.gob.ar/georef/api/v2.0/direcciones?provincia=Buenos%20Aires&departamento=Necochea&max=' + limite + '&direccion=' + encodeURIComponent(base);
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 7000);
+    const r = await fetch(url, { signal: ctl.signal }); clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.direcciones || []).filter(d => d.ubicacion && d.ubicacion.lat != null && d.ubicacion.lon != null).map(d => {
+      const alt = d.altura && d.altura.valor;
+      const loc = (d.localidad_censal && d.localidad_censal.nombre) || (d.localidad && d.localidad.nombre) || '';
+      const locT = loc ? loc.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()) : '';
+      return { lat: +d.ubicacion.lat, lng: +d.ubicacion.lon, texto: tituloCalle(d.calle) + (alt ? ' ' + alt : '') + (locT ? ', ' + locT : '') };
+    });
+  } catch (e) { return null; }
+}
+async function buscarFuente(q, limite){
+  const g = await georef(q, limite);
+  if (g && g.length) return g;
+  const j = await nom(urlBusqueda(q, limite));
+  if (j === null && g === null) return null;      // fallaron las dos fuentes
+  return (j || []).map(it => ({ lat: +it.lat, lng: +it.lon, texto: formatDir(it) }));
 }
 let sugT, busqId = 0;
 // directo = true: toma el primer resultado y ubica el pin sin pedir que elijas (Enter o lupa)
@@ -312,38 +342,33 @@ async function buscarDir(q, directo){
   const box = $('sugerencias'), est = $('dir-est');
   if (q.trim().length < 4) { box.classList.add('hidden'); est.textContent = ''; return; }
   const mi = ++busqId; est.textContent = 'Buscando…';
-  const j = await nom(urlBusqueda(q, 5));
+  const j = await buscarFuente(q, 5);
   if (mi !== busqId) return;                       // llegó una búsqueda más nueva: descarto esta
   box.innerHTML = '';
-  if (j === null) { est.textContent = 'No pudimos buscar ahora. Tocá el mapa para marcar el punto.'; box.classList.add('hidden'); return; }
-  if (!j.length) { est.textContent = 'No encontramos esa dirección. Probá sin la altura o tocá el mapa.'; box.classList.add('hidden'); return; }
+  if (j === null) { est.textContent = 'No pudimos buscar ahora. Tocá el mapa donde queda, escribí calle y altura y tocá «Usar lo que escribí».'; box.classList.add('hidden'); return; }
+  if (!j.length) { est.textContent = 'No encontramos esa dirección. Tocá el mapa donde queda, escribí calle y altura y tocá «Usar lo que escribí».'; box.classList.add('hidden'); return; }
   est.textContent = '';
   if (directo) { elegirResultado(j[0]); return; }
   j.forEach(it => {
     const b = document.createElement('button'); b.type = 'button';
     b.className = 'block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-brand-50 border-b border-slate-100 last:border-0';
-    b.textContent = formatDir(it); b.onclick = () => elegirResultado(it); box.appendChild(b);
+    b.textContent = it.texto; b.onclick = () => elegirResultado(it); box.appendChild(b);
   });
   box.classList.remove('hidden');
 }
-$('in-dir').addEventListener('input', e => { clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q, false), 700); });
+function revisarTexto(){
+  const t = $('in-dir').value.trim(), c = pts[activo];
+  $('btn-usar-texto').classList.toggle('hidden', !(c && t.length >= 3 && t !== c.dir && c.dir !== BUSCANDO));
+}
+$('in-dir').addEventListener('input', e => { revisarTexto(); clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q, false), 700); });
 $('in-dir').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sugT); buscarDir($('in-dir').value, true); } });
+$('btn-usar-texto').addEventListener('click', () => {
+  const t = $('in-dir').value.trim().slice(0, 200), c = pts[activo]; if (!c || t.length < 3) return;
+  c.dir = t; $('dir-est').textContent = ''; pintarResumen(); mostrarToast('Dirección guardada con el pin que marcaste');
+});
 $('btn-buscar').addEventListener('click', () => { clearTimeout(sugT); buscarDir($('in-dir').value, true); });
 
-async function geocodificar(q){
-  const j = await nom(urlBusqueda(q, 1)); return (j && j[0]) || null;
-}
-/* ============ FLUJO CLIENTE ============ */
-let paramsAplicados = false, comercioParam = '';
-async function irCliente(){
-  vista('cliente');
-  try { await asegurarSesion(); } catch(e){ return; }
-  if (!zonas.length) await cargarZonas();
-  iniciarMapa(); ico();
-  $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
-  $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
-  if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
-}
+async function geocodificar(q){ const j = await buscarFuente(q, 1); return (j && j[0]) || null; }
 async function aplicarParams(){
   const sp = new URLSearchParams(location.search);
   const ret = (sp.get('retiro')||'').slice(0,200), ent = (sp.get('entrega')||'').slice(0,200);
@@ -351,7 +376,7 @@ async function aplicarParams(){
   if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
   for (const [k, q] of [['r', ret], ['e', ent]]) {
     if (!q) continue;
-    try { const g = await geocodificar(q); if (g) await ponerPunto(k, +g.lat, +g.lon, q, false); else { pts[k] = null; } } catch(e){}
+    try { const g = await geocodificar(q); if (g) await ponerPunto(k, g.lat, g.lng, q, false); else { pts[k] = null; } } catch(e){}
     if (!pts[k]) { $('res-'+k).textContent = q + ' (marcalo en el mapa)'; }
   }
   if (ret) setActivo('r');
