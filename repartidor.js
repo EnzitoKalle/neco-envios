@@ -141,11 +141,11 @@
     root().innerHTML = volver() + `
       <div class="flex items-center gap-3 mb-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(p.rostro_path || '')}?t=${Date.now() % 100000}" class="w-12 h-12 rounded-2xl object-cover bg-slate-100 border border-brand-200" alt="">
       <div class="flex-1 min-w-0"><p class="font-black text-slate-900 truncate">${esc(p.nombre)}</p><p id="r-badge" class="text-[11px] font-bold"></p></div></div>
-      <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-xs font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
+      <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'horarios:Horarios', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-[11px] font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
       <div id="r-cont"></div>`;
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
-    if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
+    if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabHorarios(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
   }
 
   /* --- Pedidos --- */
@@ -160,13 +160,21 @@
     c.innerHTML = card(`
       <div class="flex items-center justify-between"><div><p class="font-black">Estado</p><p id="r-est" class="text-xs"></p></div>
         <button id="r-on" type="button" class="text-xs font-black px-4 py-2.5 rounded-xl active:scale-95"></button></div>
+      <p id="r-aviso" class="text-[11px] text-brand-700 font-bold"></p>
+      <p class="text-[11px] text-slate-500">Quedás conectado hasta que te desconectes. Activá la campanita 🔔 (arriba) para recibir los pedidos aunque tengas la app cerrada o el celu bloqueado.</p>
       <div class="flex items-center justify-between text-xs"><span class="font-bold text-slate-600">Pedidos simultáneos (máx.)</span>
         <select id="r-max" class="clean-input rounded-xl px-3 py-1.5">${Array.from({ length: Math.min(R.tope, 2) }, (_, i) => `<option value="${i + 1}" ${p.max_simultaneos === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select></div>`) +
       `<div id="r-lista" class="space-y-3 mt-3"></div>`;
     $('r-on').onclick = async () => {
-      const { error } = await _sb.rpc('ne_set_online', { p_on: !R.perfil.en_linea });
+      const quiere = !R.perfil.en_linea;
+      const { data, error } = await _sb.rpc('ne_set_online', { p_on: quiere });
       if (error) return mostrarToast(error.message);
-      R.perfil.en_linea = !R.perfil.en_linea; pintarEstado(); mostrarToast(R.perfil.en_linea ? 'Estás conectado' : 'Estás desconectado');
+      R.perfil.en_linea = quiere; pintarEstado();
+      if (quiere) { $('r-aviso').textContent = ''; mostrarToast('Estás conectado'); return; }
+      const f = fmtProximo(data && data.proximo);
+      $('r-aviso').textContent = f ? 'Te desconectaste. Vas a volver a conectarte automáticamente ' + f + ' (según tus horarios).'
+                                   : 'Te desconectaste. No tenés horarios cargados: conectate a mano cuando quieras, o cargalos en la pestaña Horarios.';
+      mostrarToast('Estás desconectado');
     };
     $('r-max').onchange = async e => { const v = +e.target.value; const { error } = await _sb.from('ne_repartidores').update({ max_simultaneos: v }).eq('user_id', sesion.user.id); if (error) mostrarToast(error.message); else { R.perfil.max_simultaneos = v; pintarEstado(); } };
     refrescarPedidos();
@@ -184,6 +192,7 @@
   async function refrescarPedidos() {
     if (R.tab !== 'pedidos' || !$('r-lista')) return;
     await _sb.rpc('ne_vencer');
+    await _sb.rpc('ne_conectar_si_horario');
     const me = await _sb.from('ne_repartidores').select('en_linea,estado,max_simultaneos').eq('user_id', sesion.user.id).single();
     if (me.data) Object.assign(R.perfil, me.data);
     const { data } = await _sb.from('ne_pedidos').select('*').eq('repartidor_id', sesion.user.id)
@@ -208,6 +217,52 @@
       }
       box.appendChild(d);
     });
+  }
+
+  /* --- Horarios --- */
+  function fmtProximo(iso) {
+    if (!iso) return null;
+    const d = new Date(iso), hoy = new Date(), man = new Date(Date.now() + 864e5);
+    const dia = d.toDateString() === hoy.toDateString() ? 'hoy' : d.toDateString() === man.toDateString() ? 'mañana' : 'el ' + d.toLocaleDateString('es-AR', { weekday: 'long' });
+    return dia + ' a las ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  }
+  const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];   // posición + 1 = día ISO
+  async function tabHorarios() {
+    const c = $('r-cont'); c.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
+    const { data, error } = await _sb.from('ne_horarios').select('*').eq('repartidor_id', sesion.user.id).order('desde');
+    if (error) { c.textContent = 'Error: ' + error.message; return; }
+    const h0 = data[0] || null, sel = new Set(h0 ? h0.dias : [1, 2, 3, 4, 5, 6, 7]);
+    const hs = []; for (let h = 0; h < 24; h++) for (const m of ['00', '30']) hs.push(String(h).padStart(2, '0') + ':' + m);
+    const desde = h0 ? h0.desde.slice(0, 5) : '09:00', hasta = h0 ? h0.hasta.slice(0, 5) : '24:00';
+    const optD = hs.map(h => `<option value="${h}" ${h === desde ? 'selected' : ''}>${h}</option>`).join('');
+    const optH = `<option value="24:00" ${hasta === '24:00' ? 'selected' : ''}>No: me desconecto yo</option>` + hs.slice(1).map(h => `<option value="${h}" ${h === hasta ? 'selected' : ''}>${h}</option>`).join('');
+    c.innerHTML = card(`<p class="font-black">Conexión automática</p>
+      <p class="text-[11px] text-slate-500">Si la activás, te conectás solo a la hora que elijas, aunque no abras la app. Siempre podés conectarte o desconectarte a mano.</p>
+      <label class="flex items-center gap-2 text-sm font-bold"><input id="h-on" type="checkbox" class="w-5 h-5" ${h0 ? 'checked' : ''}> Conectarme automáticamente</label>
+      <div id="h-cfg" class="${h0 ? '' : 'hidden'} space-y-3">
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">A partir de las</label><select id="h-de" class="clean-input w-full rounded-xl px-3 py-2 text-sm mt-1">${optD}</select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Desconectarme solo a una hora?</label><select id="h-ha" class="clean-input w-full rounded-xl px-3 py-2 text-sm mt-1">${optH}</select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Días</label>
+          <div id="h-dias" class="flex gap-1 mt-1">${DIAS.map((n, i) => `<button type="button" data-d="${i + 1}" class="flex-1 text-[11px] font-black rounded-lg py-2 ${sel.has(i + 1) ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${n}</button>`).join('')}</div></div>
+      </div>
+      ${btn('h-save', 'Guardar')}`);
+    $('h-on').onchange = e => $('h-cfg').classList.toggle('hidden', !e.target.checked);
+    $('h-dias').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+      const on = !b.classList.contains('bg-brand-600');
+      b.classList.toggle('bg-brand-600', on); b.classList.toggle('text-white', on); b.classList.toggle('bg-slate-100', !on); b.classList.toggle('text-slate-600', !on);
+    });
+    $('h-save').onclick = async () => {
+      const uid = sesion.user.id;
+      const dias = [...$('h-dias').querySelectorAll('[data-d]')].filter(b => b.classList.contains('bg-brand-600')).map(b => +b.dataset.d);
+      const de = $('h-de').value, ha = $('h-ha').value;
+      if ($('h-on').checked) {
+        if (!dias.length) return mostrarToast('Elegí al menos un día');
+        if (ha <= de) return mostrarToast('La hora de desconexión tiene que ser mayor que la de conexión');
+      }
+      let x = await _sb.from('ne_horarios').delete().eq('repartidor_id', uid); if (x.error) return mostrarToast(x.error.message);
+      if ($('h-on').checked) { x = await _sb.from('ne_horarios').insert({ repartidor_id: uid, dias, desde: de, hasta: ha }); if (x.error) return mostrarToast('Error: ' + x.error.message); }
+      mostrarToast($('h-on').checked ? 'Conexión automática guardada' : 'Conexión automática desactivada');
+    };
   }
 
   /* --- Zonas y precios --- */
@@ -266,18 +321,19 @@
   /* --- Ganancias / historial --- */
   async function tabHistorial() {
     const c = $('r-cont'); c.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
-    const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,comision_pct,retiro_dir,entrega_dir,creado,entregado_en')
+    const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,comision_pct,retiro_dir,entrega_dir,creado,entregado_en,aceptado_en,cancelado_en,comision_condonada')
       .eq('repartidor_id', sesion.user.id).in('estado', ['entregado', 'cancelado']).order('creado', { ascending: false }).limit(100);
     if (error) { c.textContent = 'Error al cargar'; return; }
     const ent = data.filter(x => x.estado === 'entregado'), hoy = new Date().toDateString(), sem = Date.now() - 7 * 864e5;
     const suma = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
-    const tot = arr => suma(arr, x => +x.precio), com = arr => suma(arr, x => x.precio * x.comision_pct / 100);
-    const dia = ent.filter(x => new Date(x.entregado_en).toDateString() === hoy), sm = ent.filter(x => new Date(x.entregado_en).getTime() > sem);
+    const tot = arr => suma(arr.filter(x => x.estado === 'entregado'), x => +x.precio), com = arr => suma(arr.filter(x => !x.comision_condonada), x => x.precio * x.comision_pct / 100);
+    const cuando = x => new Date(x.estado === 'entregado' ? x.entregado_en : x.cancelado_en), cobrables = ent;
+    const dia = cobrables.filter(x => cuando(x).toDateString() === hoy), sm = cobrables.filter(x => cuando(x).getTime() > sem);
     const bloque = (t, a) => { const T = Math.round(tot(a)), C = Math.round(com(a)); const k = (v, l) => `<div><p class="text-base font-black text-slate-900">${v}</p><p class="text-[10px] text-slate-500">${l}</p></div>`;
       return `<div class="rounded-2xl bg-slate-50 p-3"><p class="text-[11px] font-extrabold text-slate-400 uppercase mb-2">${t}</p>
         <div class="grid grid-cols-3 gap-2 text-center">${k(a.length, 'Envíos')}${k(money(T), 'Cobrado')}${k(money(C), 'Comisión')}</div>
         <div class="mt-2 pt-2 border-t border-slate-200 flex justify-between items-center"><span class="text-xs font-bold text-slate-600">Te quedan</span><span class="text-xl font-black text-brand-600">${money(T - C)}</span></div></div>`; };
-    c.innerHTML = card(`<p class="font-black">Tus ganancias</p>${bloque('Hoy', dia)}${bloque('Últimos 7 días', sm)}${bloque('Total', ent)}
+    c.innerHTML = card(`<p class="font-black">Tus ganancias</p>${bloque('Hoy', dia)}${bloque('Últimos 7 días', sm)}${bloque('Total', cobrables)}
       <p class="text-[11px] text-slate-400">La comisión se la pagás al administrador cada semana.</p>`) + '<div id="h-lista" class="space-y-2 mt-3"></div>';
     data.forEach(x => { const d = document.createElement('div'); d.className = 'clean-card rounded-2xl p-3 text-xs';
       d.innerHTML = `<div class="flex justify-between"><b class="${x.estado === 'entregado' ? 'text-brand-700' : 'text-rose-600'}">${esc(ESTADOS[x.estado])}</b><b>${money(x.precio)}</b></div><p class="text-slate-500 truncate">${esc(fixDir(x.retiro_dir))} → ${esc(fixDir(x.entrega_dir))}</p><p class="text-[10px] text-slate-400">${new Date(x.creado).toLocaleString('es-AR')}</p>`;

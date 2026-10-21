@@ -125,11 +125,11 @@
     await cargarAjustes(); const s = A.ajustes || {};
     const f = (id, l, v, min, max) => `<div><label class="text-[11px] font-extrabold text-slate-500 uppercase">${l}</label><input id="${id}" type="number" min="${min}" max="${max}" value="${Number(v)}" class="${inp} w-full mt-1"></div>`;
     $('ad-cont').innerHTML = `<div class="grid sm:grid-cols-2 gap-3">${f('aj-c', 'Comisión (%)', s.comision_pct, 0, 100)}${f('aj-t', 'Tope de pedidos simultáneos', s.tope_simultaneos, 1, 10)}
-      ${f('aj-v', 'Minutos para responder una solicitud', s.timeout_solicitud_min, 1, 60)}${f('aj-h', 'Minutos sin señal para desconectar', s.heartbeat_min, 2, 30)}</div>
+      ${f('aj-v', 'Minutos para responder una solicitud', s.timeout_solicitud_min, 1, 60)}${f('aj-h', 'Horas máximas seguidas conectado (se desconecta solo)', s.max_conectado_horas, 1, 24)}</div>
       <p class="text-[11px] text-slate-400 mt-2">Cada repartidor elige 1 o 2 pedidos simultáneos como máximo en su panel, sin pasar el tope.</p>
       <div class="mt-3">${bt('Guardar ajustes', 'bg-brand-600 text-white w-full py-3', 'id="aj-g"')}</div>`;
     $('aj-g').onclick = async () => {
-      const { error } = await _sb.from('ne_settings').update({ comision_pct: +$('aj-c').value, tope_simultaneos: +$('aj-t').value, timeout_solicitud_min: +$('aj-v').value, heartbeat_min: +$('aj-h').value }).eq('id', 1);
+      const { error } = await _sb.from('ne_settings').update({ comision_pct: +$('aj-c').value, tope_simultaneos: +$('aj-t').value, timeout_solicitud_min: +$('aj-v').value, max_conectado_horas: +$('aj-h').value }).eq('id', 1);
       if (error) mostrarToast(error.message); else mostrarToast('Ajustes guardados');
     };
   }

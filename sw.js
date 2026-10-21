@@ -1,5 +1,5 @@
 /* NECO ENVÍOS - Service worker. Sube el número de VERSION cuando cambies archivos. */
-const VERSION = 'ne-v2';
+const VERSION = 'ne-v3';
 const SHELL = ['/', '/index.html', '/repartidor.js', '/admin.js', '/push.js', '/manifest.json', '/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -15,7 +15,7 @@ self.addEventListener('fetch', e => {
 // Notificaciones push (las envía la Edge Function de la Parte 3)
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch (x) { d = { title: 'Neco Envíos', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Neco Envíos', { body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png', data: { url: d.url || '/' } }));
+  e.waitUntil(self.registration.showNotification(d.title || 'Neco Envíos', { body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: d.tag || 'neco', renotify: true, requireInteraction: true, vibrate: [300, 120, 300, 120, 300], data: { url: d.url || '/' } }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
