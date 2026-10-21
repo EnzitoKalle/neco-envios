@@ -124,6 +124,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
       </div>
       <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Consultar repartidores disponibles</button>
     </div>
+    <p id="err-sol" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3"></p>
     <div id="lista-rep" class="space-y-3"></div>
   </section>
 
@@ -356,7 +357,7 @@ async function consultar(){
   if (!zonaDe(pts.r.lat, pts.r.lng)) return mostrarToast('El retiro está fuera de nuestras zonas');
   if (!zonaDe(pts.e.lat, pts.e.lng)) return mostrarToast('La entrega está fuera de nuestras zonas');
   localStorage.setItem('ne_nombre', nombre); localStorage.setItem('ne_wsp', wsp);
-  const btn = $('btn-consultar'); btn.disabled = true;
+  const btn = $('btn-consultar'); btn.disabled = true; $('err-sol').classList.add('hidden');
   try {
     await asegurarSesion();
     const { data, error } = await _sb.rpc('ne_listar_repartidores', { r_lat:pts.r.lat, r_lng:pts.r.lng, e_lat:pts.e.lat, e_lng:pts.e.lng });
@@ -381,15 +382,25 @@ function pintarRepartidores(lista){
     box.appendChild(d);
   });
 }
+function mostrarError(m){ const e = $('err-sol'); e.textContent = m; e.classList.remove('hidden'); e.scrollIntoView({ behavior:'smooth', block:'center' }); mostrarToast(m); }
 async function solicitar(r, btn){
-  btn.disabled = true;
+  const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Solicitando…'; $('err-sol').classList.add('hidden');
+  let id = null;
   try {
     const { data, error } = await _sb.rpc('ne_crear_pedido', {
       p_rep:r.repartidor_id, p_nombre:$('c-nombre').value.trim(), p_whatsapp:$('c-wsp').value.trim(), p_comercio:comercioParam,
       r_dir:pts.r.dir, r_lat:pts.r.lat, r_lng:pts.r.lng, e_dir:pts.e.dir, e_lat:pts.e.lat, e_lng:pts.e.lng });
     if (error) throw error;
-    $('lista-rep').innerHTML = ''; abrirChat(data);
-  } catch(e){ mostrarToast(e.message || 'No se pudo solicitar'); btn.disabled = false; consultar(); }
+    id = data;
+  } catch(e){
+    let m = (e && e.message) || 'No se pudo solicitar el envío';
+    if (/3 pedidos/.test(m)) m += '. Cancelá los viejos desde el ícono del reloj (Mis pedidos).';
+    mostrarError(m); btn.disabled = false; btn.textContent = txt;
+    if (/ya no está disponible/.test(m)) consultar();
+    return;
+  }
+  try { $('lista-rep').innerHTML = ''; await abrirChat(id); }
+  catch(e){ mostrarError('Tu pedido se creó, pero no pudimos abrir el chat. Mirá el ícono del reloj (Mis pedidos). Detalle: ' + ((e && e.message) || e)); }
 }
 
 /* ============ CHAT DEL PEDIDO ============ */
