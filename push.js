@@ -1,7 +1,7 @@
 /* NECO ENVÍOS - Parte 3: activar notificaciones push en el navegador/app.
    PEGÁ ACÁ TU CLAVE PÚBLICA VAPID (la pública es segura de exponer). */
 (function () {
-  const VAPID_PUBLIC = 'PEGAR_AQUI_TU_CLAVE_PUBLICA';
+  const VAPID_PUBLIC = 'BDTw7eeBhWjhfaVOVT8Zatjjp_VfFxFRUllzvXdznFpyyuNkUhDarQ018xPxP6sE-fJHFBkvFAUTaBDxWmFGGxw';
   const configurado = VAPID_PUBLIC.length > 60;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
