@@ -204,9 +204,9 @@ async function asegurarSesion(){
   sesion = data.session; pintarLogin(); return sesion;
 }
 const esAnon = () => !!(sesion && sesion.user && sesion.user.is_anonymous);
-function pintarLogin(){ $('lbl-google').textContent = (sesion && !esAnon()) ? 'Cuenta ✓' : 'Ingresar'; }
+function pintarLogin(){ const lg = !!(sesion && !esAnon()); $('lbl-google').textContent = lg ? 'Salir' : 'Ingresar'; $('lbl-google').classList.toggle('hidden', !lg); $('btn-google').title = lg ? 'Cerrar sesión' : 'Ingresar con Google'; }
 async function loginGoogle(){
-  if (sesion && !esAnon()) { mostrarToast('Ya estás con tu cuenta de Google'); return; }
+  if (sesion && !esAnon()) { if (confirm('¿Cerrar sesión de Google?')) { localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); } return; }
   let r;
   if (esAnon()) r = await _sb.auth.linkIdentity({ provider:'google', options:{ redirectTo: location.origin } });
   if (!esAnon() || (r && r.error)) r = await _sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin } });

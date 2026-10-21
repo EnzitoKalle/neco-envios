@@ -8,7 +8,9 @@
   const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const card = h => `<div class="clean-card rounded-3xl p-5 space-y-3">${h}</div>`;
   const btn = (id, txt, cls) => `<button id="${id}" type="button" class="${cls || 'w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98]'}">${txt}</button>`;
-  const volver = `<button onclick="irInicio()" type="button" class="text-xs font-bold text-brand-600 flex items-center gap-1 mb-3"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver</button>`;
+  const volver = () => `<div class="flex justify-between items-center mb-3"><button onclick="irInicio()" type="button" class="text-xs font-bold text-brand-600 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver</button>${sesion && !esAnon() ? '<button data-salir type="button" class="text-xs font-bold text-slate-500 underline">Cerrar sesión</button>' : ''}</div>`;
+  async function salir() { if (!confirm('¿Cerrar sesión de Google?')) return; localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); }
+  root().addEventListener('click', e => { if (e.target.closest('[data-salir]')) salir(); });
 
   function detener() { clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); }
   function cerrarCamara() { if (R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; } }
@@ -30,7 +32,7 @@
 
   /* ---------- 1. INSTALAR ---------- */
   function pInstalar() {
-    root().innerHTML = volver + card(`
+    root().innerHTML = volver() + card(`
       <div class="text-center"><div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-400 text-white flex items-center justify-center text-2xl font-black shadow-md">N</div>
       <h2 class="text-xl font-black mt-3">Instalá la app de repartidores</h2>
       <p class="text-xs text-slate-500 mt-1">Con la app instalada recibís avisos de nuevos pedidos y funciona más rápido.</p></div>
@@ -45,7 +47,7 @@
 
   /* ---------- 2. LOGIN GOOGLE (obligatorio) ---------- */
   function pLogin() {
-    root().innerHTML = volver + card(`
+    root().innerHTML = volver() + card(`
       <h2 class="text-xl font-black">Ingresá con Google</h2>
       <p class="text-xs text-slate-500">Para trabajar como repartidor necesitamos que ingreses con tu cuenta de Google.</p>
       ${btn('l-go', 'Continuar con Google')}`);
@@ -66,7 +68,7 @@
   }
   function pRegistro() {
     R.rostro = null; R.dni = null;
-    root().innerHTML = volver + card(`
+    root().innerHTML = volver() + card(`
       <h2 class="text-xl font-black">Registro de repartidor</h2>
       <p class="text-xs text-slate-500">Revisamos tus datos antes de aprobarte. El DNI solo lo ve el administrador.</p>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Nombre completo</label><input id="g-nom" maxlength="80" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"></div>
@@ -104,11 +106,16 @@
     if (!R.rostro) return mostrarToast('Falta la foto de rostro con la cámara');
     const b = $('g-send'); b.disabled = true; b.textContent = 'Enviando...';
     try {
-      const uid = sesion.user.id;
-      let r = await _sb.storage.from('ne-dni').upload(uid + '/dni.jpg', R.dni, { upsert: true, contentType: 'image/jpeg' }); if (r.error) throw r.error;
-      r = await _sb.storage.from('ne-rostros').upload(uid + '/rostro.jpg', R.rostro, { upsert: true, contentType: 'image/jpeg' }); if (r.error) throw r.error;
-      r = await _sb.from('ne_repartidores').insert({ user_id: uid, nombre: nom, documento: doc, vehiculo: veh, dni_path: uid + '/dni.jpg', rostro_path: uid + '/rostro.jpg' });
-      if (r.error) throw r.error;
+      const ses = (await _sb.auth.getSession()).data.session;
+      if (!ses || ses.user.is_anonymous) throw new Error('Tu sesión de Google se perdió. Volvé a ingresar.');
+      const uid = ses.user.id, t = Date.now();
+      const pDni = uid + '/dni-' + t + '.jpg', pRos = uid + '/rostro-' + t + '.jpg';
+      let r = await _sb.storage.from('ne-dni').upload(pDni, R.dni, { contentType: 'image/jpeg' });
+      if (r.error) throw new Error('Subiendo DNI: ' + r.error.message);
+      r = await _sb.storage.from('ne-rostros').upload(pRos, R.rostro, { contentType: 'image/jpeg' });
+      if (r.error) throw new Error('Subiendo foto de rostro: ' + r.error.message);
+      r = await _sb.from('ne_repartidores').insert({ user_id: uid, nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos });
+      if (r.error) throw new Error('Guardando datos: ' + r.error.message);
       mostrarToast('Registro enviado. Ahora elegí tus zonas y precios.'); R.tab = 'zonas'; pantalla();
     } catch (e) { mostrarToast('Error: ' + (e.message || e)); b.disabled = false; b.textContent = 'Enviar registro'; }
   }
@@ -131,7 +138,7 @@
   /* ---------- 5. PANEL ---------- */
   function pPanel() {
     const p = R.perfil;
-    root().innerHTML = volver + `
+    root().innerHTML = volver() + `
       <div class="flex items-center gap-3 mb-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(p.rostro_path || '')}?t=${Date.now() % 100000}" class="w-12 h-12 rounded-2xl object-cover bg-slate-100 border border-brand-200" alt="">
       <div class="flex-1 min-w-0"><p class="font-black text-slate-900 truncate">${esc(p.nombre)}</p><p id="r-badge" class="text-[11px] font-bold"></p></div></div>
       <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-xs font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
