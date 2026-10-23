@@ -15,6 +15,10 @@
 <meta name="apple-mobile-web-app-title" content="NecoEnvíos">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
+<link rel="preconnect" href="https://itpkfuprqihmclsqjfki.supabase.co" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://apis.datos.gob.ar" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -125,7 +129,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
         <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Retiro</b><p id="res-r" class="text-slate-600 break-words">Sin elegir</p></div>
         <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Entrega</b><p id="res-e" class="text-slate-600 break-words">Sin elegir</p></div>
       </div>
+      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cómo pagás el envío?</p><div id="pg-met" class="flex gap-1.5"><button type="button" data-v="efectivo" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">💵 Efectivo</button><button type="button" data-v="transferencia" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🏦 Transferencia</button></div></div>
+      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cuándo le pagás al repartidor?</p><div id="pg-mom" class="flex gap-1.5"><button type="button" data-v="retiro" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">En el retiro</button><button type="button" data-v="entrega" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">En la entrega</button></div></div>
+      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿El pedido (la compra) ya está pago?</p><div id="pg-pag" class="flex gap-1.5"><button type="button" data-v="si" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">Sí, ya está pago</button><button type="button" data-v="no" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">No, que lo pague el repartidor</button></div><div id="adel-box" class="hidden mt-2"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto que paga el repartidor en el comercio ($)</label><input id="adel-monto" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 15000"><p class="text-[11px] text-slate-400 mt-1">Se lo devolvés al repartidor cuando recibís el pedido. Solo aparecen repartidores que manejan efectivo y llegan a ese monto.</p></div></div>
       <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Qué vehículo necesitás?</p><div id="filtro-veh" class="flex gap-1.5"><button type="button" data-v="todos" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">Cualquiera</button><button type="button" data-v="moto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🏍️ Moto</button><button type="button" data-v="auto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚗 Auto</button><button type="button" data-v="bici" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚲 Bici</button></div><p class="text-[11px] text-slate-400 mt-1">Para paquetes grandes o frágiles, elegí Auto.</p></div>
+      <label id="tc-box" class="flex items-start gap-2 text-xs font-bold text-slate-700"><input id="tc-ok" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Estoy de acuerdo con los <button type="button" id="tc-leer" class="underline text-brand-700 font-black">Términos y condiciones</button></span></label>
       <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Consultar repartidores disponibles</button>
     </div>
     <p id="err-sol" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3"></p>
@@ -235,21 +243,30 @@ function enPoligono(lat, lng, geo){
 }
 function zonaDe(lat, lng){ const z = zonas.find(z => enPoligono(lat, lng, z.geojson)); return z ? z.nombre : null; }
 async function cargarZonas(){
-  const { data, error } = await _sb.from('ne_zonas').select('id,nombre,color,orden,geojson').order('orden');
-  if (error) { mostrarToast('No se pudieron cargar las zonas'); return; }
-  zonas = data || [];
+  let cache = null; try { cache = JSON.parse(localStorage.getItem('ne_zonas_v1') || 'null'); } catch (e) {}
+  const pedir = async () => {
+    const { data, error } = await _sb.from('ne_zonas').select('id,nombre,color,orden,geojson').order('orden');
+    if (error) { if (!cache) mostrarToast('No se pudieron cargar las zonas'); return; }
+    zonas = data || []; try { localStorage.setItem('ne_zonas_v1', JSON.stringify(zonas)); } catch (e) {}
+  };
+  if (cache && cache.length) { zonas = cache; pedir(); return; }   // usa lo guardado y actualiza en segundo plano
+  await pedir();
+}
+let zonasDibujadas = false;
+function dibujarZonas(){
+  if (zonasDibujadas || !mapa || !zonas.length) return; zonasDibujadas = true;
+  zonas.forEach(z => L.geoJSON(z.geojson, { style:{ color:rgbaOk(z.color), weight:1.5, fillOpacity:.12 } }).bindTooltip(z.nombre, {sticky:true}).addTo(capaZonas));
 }
 function iniciarMapa(){
   if (mapa) { setTimeout(()=>mapa.invalidateSize(), 100); return; }
   mapa = L.map('mapa').setView([-38.56, -58.74], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(mapa);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap', keepBuffer:4, updateWhenIdle:true, updateWhenZooming:false }).addTo(mapa);
   capaZonas = L.layerGroup().addTo(mapa);
-  zonas.forEach(z => L.geoJSON(z.geojson, { style:{ color:rgbaOk(z.color), weight:1.5, fillOpacity:.12 } }).bindTooltip(z.nombre, {sticky:true}).addTo(capaZonas));
   mapa.on('click', e => {
     const cur = pts[activo]; let keep = null;
     if (cur && cur.dir !== PUNTO) keep = cur.dir;                       // mover el pin NO cambia el texto de la dirección
     else { const p = parseDir($('in-dir').value); if (p && p.altura) keep = p.texto; }
-    ponerPunto(activo, e.latlng.lat, e.latlng.lng, keep, false, true);
+    ponerPunto(activo, e.latlng.lat, e.latlng.lng, keep, false, false);
   });
 }
 function setActivo(k){
@@ -271,8 +288,8 @@ let nomQ = Promise.resolve();
 function nom(url){
   const p = nomQ.then(async () => {
     for (let n = 0; n < 2; n++) {
-      try { const r = await fetch(url); if (r.ok) return await r.json(); } catch (e) {}
-      await new Promise(r => setTimeout(r, 1500));
+      try { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000); const r = await fetch(url, { signal: ctl.signal }); clearTimeout(t); if (r.ok) return await r.json(); } catch (e) {}
+      await new Promise(r => setTimeout(r, 700));
     }
     return null;
   });
@@ -291,14 +308,14 @@ function mostrarAlt(k, alt){
   mapa.fitBounds([[pts[k].lat, pts[k].lng], [alt.lat, alt.lng]], { padding:[40,40], maxZoom:17 });
   revisarTexto();
 }
-function usarAlt(k){ const a = altPts[k]; if (!a) return; ponerPunto(k, a.lat, a.lng, pts[k].dir, false, true); }
+function usarAlt(k){ const a = altPts[k]; if (!a) return; ponerPunto(k, a.lat, a.lng, pts[k].dir, false, false); }
 // confirmado = true cuando la persona puso/movió el pin a mano o eligió entre dos pines
 async function ponerPunto(k, lat, lng, dir, reverse, confirmado){
   quitarAlt(k);
   pts[k] = { lat, lng, dir: dir || PUNTO }; okp[k] = !!confirmado;
   if (!marks[k]) {
     marks[k] = L.marker([lat,lng], { draggable:true, icon: mkIcon(k==='r' ? '#0b6e5a' : '#f59e0b', k==='r' ? 'R' : 'E') }).addTo(mapa);
-    marks[k].on('dragend', e => { const p = e.target.getLatLng(); ponerPunto(k, p.lat, p.lng, pts[k] ? pts[k].dir : null, false, true); });
+    marks[k].on('dragend', e => { const p = e.target.getLatLng(); ponerPunto(k, p.lat, p.lng, pts[k] ? pts[k].dir : null, false, false); });
   } else marks[k].setLatLng([lat,lng]);
   if (k === activo) {
     $('in-dir').value = pts[k].dir === PUNTO ? '' : pts[k].dir;
@@ -388,7 +405,7 @@ async function buscarDir(q, directo){
       if (pts[activo]) { /* mantiene el pin actual */ } else { pts[activo] = null; } return; }
     if (A && B) {
       const d = dist(A, B);
-      if (d <= 120) { ponerPunto(activo, A.lat, A.lng, p.texto, false, true); mapa.setView([A.lat, A.lng], 17); setEst('✅ Dos mapas distintos coinciden. Igual revisá el pin: podés arrastrarlo.', true); }
+      if (d <= 120) { ponerPunto(activo, A.lat, A.lng, p.texto, false, false); mapa.setView([A.lat, A.lng], 17); setEst('✅ Los dos mapas coinciden. Confirmá con el botón verde que el pin está bien.', true); }
       else { ponerPunto(activo, A.lat, A.lng, p.texto, false, false); mostrarAlt(activo, { lat: B.lat, lng: B.lng }); setEst('Los dos mapas no coinciden (a ' + Math.round(d) + ' m). Elegí cuál pin es el correcto, o arrastralo.', false); }
     } else {
       const X = A || B; ponerPunto(activo, X.lat, X.lng, p.texto, false, false); mapa.setView([X.lat, X.lng], 17);
@@ -432,9 +449,12 @@ async function geocodificar(q){ const j = await buscarFuente(q, 1); return (j &&
 let paramsAplicados = false, comercioParam = '';
 async function irCliente(){
   vista('cliente');
-  try { await asegurarSesion(); } catch(e){ return; }
-  if (!zonas.length) await cargarZonas();
-  iniciarMapa(); ico();
+  iniciarMapa();                                                     // el mapa y sus fotos empiezan a cargar YA
+  const pSes = asegurarSesion().then(() => true, () => false), pZon = zonas.length ? Promise.resolve() : cargarZonas();
+  const [okSes] = await Promise.all([pSes, pZon]);
+  if (!okSes) return;
+  dibujarZonas(); ico();
+  tcAceptados = await aceptoTerminos('cliente'); $('tc-box').classList.toggle('hidden', tcAceptados);
   $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
   $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
   if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
@@ -457,6 +477,12 @@ async function consultar(){
   const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
   if (nombre.length < 2) return mostrarToast('Poné tu nombre');
   if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Poné tu WhatsApp');
+  if (!tcAceptados) {
+    if (!$('tc-ok').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» con los términos para continuar');
+    const ac = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'cliente', p_version: TERMINOS_VERSION });
+    if (ac.error) return mostrarToast('No se pudo guardar la aceptación: ' + ac.error.message);
+    tcAceptados = true; $('tc-box').classList.add('hidden');
+  }
   const txt = $('in-dir').value.trim(), cur = pts[activo];
   if (txt && (!cur || cur.dir !== txt)) return mostrarToast('Tocá la lupa 🔍 (o elegí una opción) para ubicar la dirección que escribiste');
   if ((pts.r && pts.r.dir === BUSCANDO) || (pts.e && pts.e.dir === BUSCANDO)) return mostrarToast('Esperá un segundo, estamos buscando la dirección');
@@ -469,14 +495,17 @@ async function consultar(){
   const btn = $('btn-consultar'); btn.disabled = true; $('err-sol').classList.add('hidden');
   try {
     await asegurarSesion();
-    const { data, error } = await _sb.rpc('ne_listar_repartidores', { r_lat:pts.r.lat, r_lng:pts.r.lng, e_lat:pts.e.lat, e_lng:pts.e.lng });
+    let adel = 0;
+    if (pagoAdelanto) { adel = Math.round(parseFloat($('adel-monto').value)); if (!(adel > 0 && adel <= 1000000)) { btn.disabled = false; return mostrarToast('Poné cuánto tiene que pagar el repartidor en el comercio'); } }
+    adelConsultado = adel;
+    const { data, error } = await _sb.rpc('ne_listar_repartidores', { r_lat:pts.r.lat, r_lng:pts.r.lng, e_lat:pts.e.lat, e_lng:pts.e.lng, p_metodo:pagoMetodo, p_momento:pagoMomento, p_adelanto:adel });
     if (error) throw error;
     pintarRepartidores(data || []);
   } catch(e){ mostrarToast('Error: ' + (e.message || e)); }
   btn.disabled = false;
 }
 const VEH = { moto:'🏍️ Moto', bici:'🚲 Bici', auto:'🚗 Auto' };
-let filtroVeh = 'todos', ultimaLista = [];
+let filtroVeh = 'todos', ultimaLista = [], pagoMetodo = 'efectivo', pagoMomento = 'entrega', pagoAdelanto = false, adelConsultado = 0;
 function pintarRepartidores(lista){
   if (lista) ultimaLista = lista;
   lista = ultimaLista.filter(r => filtroVeh === 'todos' || r.vehiculo === filtroVeh);
@@ -487,7 +516,7 @@ function pintarRepartidores(lista){
     const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
     d.innerHTML = `<img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
       <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>
-      <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo]||r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p></div>
+      <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo]||r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p><p class="text-[10px] text-slate-500">${pagoMetodo === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo'} · ${pagoMomento === 'retiro' ? 'en el retiro' : 'en la entrega'}${adelConsultado > 0 ? ' · adelanta ' + money(adelConsultado) : ''}</p></div>
       <div class="text-right"><p class="font-black text-lg text-brand-600">${money(r.precio)}</p>
       <button type="button" class="mt-1 bg-brand-600 text-white text-xs font-black px-3 py-1.5 rounded-xl active:scale-95">Solicitar</button></div>`;
     d.querySelector('button').onclick = ev => solicitar(r, ev.currentTarget);
@@ -500,13 +529,48 @@ document.querySelectorAll('#filtro-veh [data-v]').forEach(b => b.addEventListene
   document.querySelectorAll('#filtro-veh [data-v]').forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === filtroVeh ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
   if (ultimaLista.length) pintarRepartidores();
 }));
+// Borra las fotos (DNI y rostro) de un repartidor en el almacenamiento. Devuelve cuántos archivos no se pudieron borrar.
+async function borrarArchivosRep(uid){
+  let fallos = 0;
+  for (const bucket of ['ne-dni', 'ne-rostros']) {
+    try {
+      const l = await _sb.storage.from(bucket).list(uid);
+      if (l.data && l.data.length) { const r = await _sb.storage.from(bucket).remove(l.data.map(f => uid + '/' + f.name)); if (r.error) fallos++; }
+    } catch (e) { fallos++; }
+  }
+  return fallos;
+}
+function limpiarLista(){ ultimaLista = []; $('lista-rep').innerHTML = ''; }
+function chipsGrupo(id, valor, alElegir){
+  const bs = document.querySelectorAll('#' + id + ' [data-v]');
+  const pintar = () => bs.forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === valor() ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
+  bs.forEach(b => b.addEventListener('click', () => { alElegir(b.dataset.v); pintar(); limpiarLista(); }));
+  pintar();
+}
+chipsGrupo('pg-met', () => pagoMetodo, v => { pagoMetodo = v; });
+chipsGrupo('pg-mom', () => pagoMomento, v => { pagoMomento = v; });
+chipsGrupo('pg-pag', () => pagoAdelanto ? 'no' : 'si', v => { pagoAdelanto = (v === 'no'); $('adel-box').classList.toggle('hidden', !pagoAdelanto); });
+$('tc-leer').addEventListener('click', () => mostrarLegal('terminos'));
+// Resumen de cómo se paga (lo usan el cliente, el repartidor y el chat)
+function resumenPago(p, esCli){
+  const met = p.pago_envio_metodo === 'transferencia' ? 'transferencia' : 'efectivo';
+  const cuando = p.pago_envio_momento === 'retiro' ? 'en el retiro' : 'en la entrega';
+  const adel = Number(p.adelanto_monto || 0);
+  let h = '<p class="text-xs text-slate-700">💵 ' + (esCli ? 'Pagás el envío' : 'Cobrás el envío') + ' (<b>' + money(p.precio) + '</b>) por <b>' + met + '</b> <b>' + cuando + '</b>.</p>';
+  if (adel > 0) {
+    h += '<p class="text-xs text-slate-700">🛒 ' + (esCli ? 'El repartidor paga <b>' + money(adel) + '</b> en el comercio y se lo devolvés al recibir el pedido.' : 'Pagás <b>' + money(adel) + '</b> en el comercio y se lo cobrás al cliente en la entrega.') + '</p>';
+    const tot = adel + (p.pago_envio_momento === 'entrega' ? Number(p.precio) : 0);
+    h += '<p class="text-xs font-black text-slate-900">Total ' + (esCli ? 'a pagar' : 'a cobrar') + ' en la entrega: ' + money(tot) + '</p>';
+  }
+  return h;
+}
 async function solicitar(r, btn){
   const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Solicitando…'; $('err-sol').classList.add('hidden');
   let id = null;
   try {
     const { data, error } = await _sb.rpc('ne_crear_pedido', {
       p_rep:r.repartidor_id, p_nombre:$('c-nombre').value.trim(), p_whatsapp:$('c-wsp').value.trim(), p_comercio:comercioParam,
-      r_dir:pts.r.dir, r_lat:pts.r.lat, r_lng:pts.r.lng, e_dir:pts.e.dir, e_lat:pts.e.lat, e_lng:pts.e.lng });
+      r_dir:pts.r.dir, r_lat:pts.r.lat, r_lng:pts.r.lng, e_dir:pts.e.dir, e_lat:pts.e.lat, e_lng:pts.e.lng, p_metodo:pagoMetodo, p_momento:pagoMomento, p_adelanto:adelConsultado });
     if (error) throw error;
     id = data;
   } catch(e){
@@ -539,9 +603,12 @@ async function refrescarPedido(){
   const { data } = await _sb.from('ne_pedidos').select('*').eq('id', chatId).single();
   if (!data) return; chatPedido = data;
   $('ch-estado').textContent = ESTADOS[data.estado] || data.estado;
-  $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(fixDir(data.retiro_dir))}</p><p>🏁 Entrega: ${esc(fixDir(data.entrega_dir))}</p><p>💵 ${sesion && data.cliente_id === sesion.user.id ? 'Total a pagar al repartidor' : 'Total a cobrar al cliente'}: <b>${money(data.precio)}</b> (efectivo o transferencia)</p>${sesion && data.cliente_id === sesion.user.id ? (data.estado === 'solicitado' ? '<p>ℹ️ Podés cancelar hasta que el repartidor acepte.</p>' : ABIERTOS.includes(data.estado) ? '<p>ℹ️ Pedido aceptado: ya no se puede cancelar.</p>' : '') : ''}`;
+  $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(fixDir(data.retiro_dir))}</p><p>🏁 Entrega: ${esc(fixDir(data.entrega_dir))}</p>${resumenPago(data, sesion && data.cliente_id === sesion.user.id)}${sesion && data.cliente_id === sesion.user.id ? (data.estado === 'solicitado' ? '<p>ℹ️ Podés cancelar hasta que el repartidor acepte.</p>' : ABIERTOS.includes(data.estado) ? '<p>ℹ️ Pedido aceptado: ya no se puede cancelar.</p>' : '') : ''}`;
   const ac = $('ch-acciones'); ac.innerHTML = '';
   const esCli = sesion && data.cliente_id === sesion.user.id;
+  if (esCli && data.pago_envio_metodo === 'transferencia' && ['aceptado','en_camino_retiro','retirado'].includes(data.estado)) {
+    _sb.rpc('ne_datos_pago', { p_pedido: data.id }).then(r => { if (r.data && r.data.alias) $('ch-info').insertAdjacentHTML('beforeend', '<p class="text-xs">🏦 Alias para transferir: <b>' + esc(r.data.alias) + '</b></p>'); });
+  }
   if (esCli && CANCELABLES.includes(data.estado)) {
     const b = document.createElement('button'); b.type = 'button';
     b.className = 'w-full bg-rose-50 border border-rose-200 text-rose-600 text-xs font-black rounded-xl py-2.5 active:scale-95'; b.textContent = 'Cancelar pedido';
@@ -603,20 +670,37 @@ async function abrirMisPedidos(){
 }
 
 /* ============ LEGAL ============ */
+const TERMINOS_VERSION = '2026-10-v1';   // si cambiás los términos, cambiá este número y se vuelve a pedir la aceptación
+let tcAceptados = false;
+async function aceptoTerminos(tipo){ try { const { data } = await _sb.rpc('ne_acepto_terminos', { p_tipo: tipo, p_version: TERMINOS_VERSION }); return data === true; } catch (e) { return false; } }
 const LEGAL = {
   terminos: ['Términos y condiciones', [
     'NecoEnvíos conecta personas que necesitan un envío con repartidores independientes de Necochea y Quequén. No somos el transportista ni empleador de los repartidores.',
+    'Responsabilidad: cada repartidor es responsable de su conducción, de su vehículo y de los daños que cause. NecoEnvíos actúa como intermediario tecnológico y, en la medida en que la ley lo permita, no responde por las acciones de los repartidores ni por daños, pérdidas o demoras durante el transporte. Esto no excluye la responsabilidad que la ley no permite excluir. Si tenés un problema con un envío, avisá al administrador.',
     'El precio del envío lo fija cada repartidor y se muestra antes de solicitar. Se abona directamente al repartidor (efectivo o transferencia).',
     'Podés cancelar un pedido mientras el repartidor no lo haya aceptado. Una vez aceptado, ya no se puede cancelar. Los repartidores pueden aceptar o rechazar solicitudes.',
     'Está prohibido enviar artículos ilegales, peligrosos o prohibidos por la ley argentina. Los usuarios se comprometen a un trato respetuoso en el chat.',
     'Repartidores: la comisión se abona por cada pedido entregado. Acordar o hacer envíos por fuera de la aplicación para evitar la comisión puede causar la baja de la cuenta. El chat oculta teléfonos y mails.',
     'Podemos pausar o dar de baja cuentas que incumplan estas reglas. Estos términos se rigen por las leyes de la República Argentina.']],
+  terminos_rep: ['Términos y condiciones para repartidores', [
+    'Qué es NecoEnvíos. NecoEnvíos es una plataforma tecnológica que pone en contacto a clientes que necesitan un envío con repartidores independientes de Necochea y Quequén. NecoEnvíos no presta el servicio de transporte, no es empleador de los repartidores y no es parte del contrato de transporte que se acuerda entre cliente y repartidor.',
+    'Independencia. Como repartidor decidís libremente si te conectás, cuándo, en qué zonas trabajás, qué pedidos aceptás o rechazás y qué precio cobrás. No hay exclusividad: podés trabajar en otras plataformas o por tu cuenta. No hay horarios ni cantidad mínima de pedidos. Usás tus propios medios: vehículo, celular, combustible y vestimenta.',
+    'Datos y documentación. Declarás que el nombre, el número de documento y las fotos que presentás son verdaderos y propios. Te comprometés a conducir solo con licencia de conducir vigente y con el seguro obligatorio del vehículo vigente, y a presentar esa documentación si NecoEnvíos te la solicita. Cargar datos falsos es causal de baja.',
+    'Tu responsabilidad. Sos el único responsable de tu conducción, del cumplimiento de las normas de tránsito, del estado de tu vehículo, de los daños que causes a terceros, a las cosas que transportás o a vos mismo, y de los accidentes que sufras. NecoEnvíos no contrata ni paga seguros de accidentes en tu favor; te recomendamos contar con un seguro de accidentes personales y con el seguro de responsabilidad civil de tu vehículo.',
+    'Obligaciones impositivas y previsionales. Sos responsable de tu situación impositiva y previsional (por ejemplo, tu inscripción como monotributista u otra categoría que corresponda) y del pago de tus aportes e impuestos.',
+    'Precios, cobros y comisión. Fijás tu propio precio por cada recorrido. El cliente te paga el envío directamente a vos, en efectivo o por transferencia, según lo que configures. Por cada pedido entregado abonás a NecoEnvíos la comisión porcentual vigente, que se calcula solo sobre el precio del envío y se liquida semanalmente. Si ofrecés adelantar el pago de compras en comercios, lo hacés por tu cuenta y riesgo: NecoEnvíos no garantiza que el cliente te devuelva ese dinero.',
+    'Cumplimiento de los pedidos. Al aceptar un pedido te comprometés a cumplirlo con diligencia, respetando el precio y las condiciones acordadas en la aplicación. No podés transportar objetos ilegales, peligrosos o prohibidos por la ley. Está prohibido acordar o realizar envíos por fuera de la aplicación para evitar la comisión, y compartir datos de contacto por el chat. Debés tratar con respeto a clientes y comercios.',
+    'Datos personales. Tus datos se tratan conforme a la Ley 25.326 de Protección de Datos Personales. La foto del DNI solo la ve el administrador. Podés eliminar tu perfil cuando quieras desde la aplicación.',
+    'Suspensión y baja. NecoEnvíos puede rechazar tu registro, pausar o dar de baja tu cuenta si incumplís estos términos, presentás datos falsos, recibís reclamos reiterados o hacés maniobras para evitar la comisión.',
+    'Responsabilidad de NecoEnvíos. NecoEnvíos actúa como intermediario tecnológico. En la medida en que la ley lo permita, no responde por las acciones u omisiones de los repartidores, ni por los daños que ocurran durante el transporte, ni por accidentes. Esto no excluye la responsabilidad que la ley no permite excluir.',
+    'Ley aplicable y jurisdicción. Estos términos se rigen por las leyes de la República Argentina. Para cualquier controversia, y sin perjuicio de las normas de orden público, las partes se someten a los tribunales ordinarios del Departamento Judicial de Necochea, Provincia de Buenos Aires.',
+    'Aceptación. Al marcar «Estoy de acuerdo» declarás haber leído y aceptado estos términos. Se guarda la fecha, la hora y la versión que aceptaste, y se te volverá a pedir si los términos cambian.']],
   privacidad: ['Política de privacidad', [
     'Responsable: NecoEnvíos (Necochea, Buenos Aires). Tratamos tus datos conforme a la Ley 25.326 de Protección de Datos Personales de Argentina.',
     'Clientes: guardamos tu nombre, tu WhatsApp, las direcciones de tus pedidos y los mensajes del chat. Tu teléfono no se muestra al repartidor.',
     'Repartidores: guardamos nombre completo, número de documento, foto del DNI y foto de rostro para verificar identidad. La foto del DNI se guarda en un espacio privado y solo la ve el administrador. La foto de rostro se muestra a los clientes.',
     'Usamos Supabase (base de datos y archivos) y servicios de mapas de OpenStreetMap. No vendemos tus datos.',
-    'Podés pedir acceso, rectificación o eliminación de tus datos escribiendo al administrador. La Agencia de Acceso a la Información Pública es el órgano de control de la Ley 25.326.']]
+    'Los repartidores pueden eliminar su perfil desde la app: se borran su DNI, sus fotos y sus datos personales, y se conserva el registro de pedidos y comisiones sin datos personales. Podés pedir acceso, rectificación o eliminación de tus datos escribiendo al administrador. La Agencia de Acceso a la Información Pública es el órgano de control de la Ley 25.326.']]
 };
 function mostrarLegal(t){
   $('legal-titulo').textContent = LEGAL[t][0]; const box = $('legal-texto'); box.innerHTML = '';
@@ -628,10 +712,18 @@ function mostrarLegal(t){
 function irRepartidor(){ mostrarToast('El registro de repartidores se activa con la Parte 2B'); }
 
 /* ============ ARRANQUE ============ */
+function irPorUrl(u){
+  const sp = new URL(u, location.origin).searchParams, id = sp.get('chat');
+  if (id && /^[0-9a-f-]{36}$/i.test(id)) abrirChat(id);
+  else if (sp.get('rep') === '1' && typeof irRepartidor === 'function') irRepartidor();
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.url) irPorUrl(e.data.url); });
 (async () => {
   ico();
   try { await asegurarSesion(); } catch(e){}
-  if (new URLSearchParams(location.search).has('retiro') || new URLSearchParams(location.search).has('entrega')) irCliente();
+  const sp = new URLSearchParams(location.search);
+  if (sp.has('chat') || sp.has('rep')) { irPorUrl('/' + location.search); history.replaceState(null, '', location.pathname); }
+  else if (sp.has('retiro') || sp.has('entrega')) irCliente();
 })();
 </script>
 <script src="repartidor.js"></script>

@@ -12,21 +12,22 @@
   async function salir() { if (!confirm('¿Cerrar sesión de Google?')) return; localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); }
   root().addEventListener('click', e => { if (e.target.closest('[data-salir]')) salir(); });
 
-  function detener() { clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); }
+  function detener() { clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
   function cerrarCamara() { if (R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; } }
 
   window.irRepartidor = async function () { vista('repartidor'); await pantalla(); };
 
   async function pantalla() {
     detener();
-    if (!esApp() && !localStorage.getItem('ne_skip_install')) return pInstalar();
     const { data } = await _sb.auth.getSession();
-    const s = data.session;
-    if (!s || s.user.is_anonymous) return pLogin();
-    sesion = s;
-    const r = await _sb.from('ne_repartidores').select('*').eq('user_id', s.user.id).maybeSingle();
-    R.perfil = r.data;
-    if (!R.perfil) return pRegistro();
+    const s = data.session, logueado = !!(s && !s.user.is_anonymous);
+    let perfil = null;
+    if (logueado) { sesion = s; const q = await _sb.from('ne_repartidores').select('*').eq('user_id', s.user.id).maybeSingle(); perfil = q.data; }
+    if (!perfil && !esApp() && !localStorage.getItem('ne_skip_install')) return pInstalar();
+    if (!logueado) return pLogin();
+    R.perfil = perfil;
+    if (!perfil || perfil.estado === 'eliminado') return pRegistro();
+    if (!(await aceptoTerminos('repartidor'))) return pTerminos();
     await cargarBase(); pPanel();
   }
 
@@ -58,6 +59,22 @@
     };
   }
 
+  /* ---------- Términos para repartidores ---------- */
+  const RESUMEN_REP = '<div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 text-[12px] text-brand-700 space-y-1"><p><b>Resumen:</b> NecoEnvíos es una plataforma que conecta clientes con repartidores independientes. No es empleador ni transportista. Cada repartidor decide cuándo y dónde trabaja y es responsable de su conducción, su vehículo, su licencia, su seguro, sus impuestos y de cualquier daño que cause. NecoEnvíos no se responsabiliza por los actos de los repartidores ni por accidentes, en la medida en que la ley lo permita.</p></div>';
+  function pTerminos() {
+    root().innerHTML = volver() + card(`<p class="font-black text-lg">Términos y condiciones para repartidores</p>${RESUMEN_REP}
+      <button id="t-leer" type="button" class="text-xs font-black text-brand-700 underline text-left">Leer los términos completos</button>
+      <label class="flex items-start gap-2 text-sm font-bold"><input id="t-ok" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Estoy de acuerdo con los Términos y condiciones para repartidores</span></label>
+      ${btn('t-acep', 'Aceptar y continuar')}`);
+    $('t-leer').onclick = () => mostrarLegal('terminos_rep');
+    $('t-acep').onclick = async () => {
+      if (!$('t-ok').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» para continuar');
+      const { error } = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'repartidor', p_version: TERMINOS_VERSION });
+      if (error) return mostrarToast('No se pudo guardar: ' + error.message);
+      pantalla();
+    };
+  }
+
   /* ---------- 3. REGISTRO ---------- */
   async function comprimir(file, max) {
     const bmp = await createImageBitmap(file);
@@ -81,6 +98,9 @@
         <video id="g-video" playsinline muted class="hidden w-full max-w-[260px] mx-auto rounded-2xl bg-black mt-2"></video>
         <img id="g-prev" class="hidden w-32 h-32 rounded-2xl object-cover mx-auto mt-2 border border-brand-300" alt="">
         <div class="flex gap-2 mt-2">${btn('g-cam', 'Abrir cámara', 'flex-1 bg-slate-900 text-white font-bold text-xs rounded-xl py-2.5')}${btn('g-cap', 'Sacar foto', 'hidden flex-1 bg-brand-600 text-white font-bold text-xs rounded-xl py-2.5')}</div></div>
+      ${RESUMEN_REP}
+      <button id="g-leer" type="button" class="text-xs font-black text-brand-700 underline text-left">Leer los términos completos</button>
+      <label class="flex items-start gap-2 text-sm font-bold"><input id="g-acepto" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Estoy de acuerdo con los Términos y condiciones para repartidores</span></label>
       ${btn('g-send', 'Enviar registro')}`);
     $('g-dni').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { R.dni = await comprimir(f, 1400); $('g-dni-ok').textContent = '✓ DNI cargado'; } catch (x) { mostrarToast('No pudimos leer esa imagen'); } };
     $('g-cam').onclick = async () => {
@@ -96,10 +116,12 @@
       c.toBlob(b => { R.rostro = b; $('g-prev').src = URL.createObjectURL(b); $('g-prev').classList.remove('hidden'); }, 'image/jpeg', 0.85);
       cerrarCamara(); v.classList.add('hidden'); $('g-cap').classList.add('hidden');
     };
+    $('g-leer').onclick = () => mostrarLegal('terminos_rep');
     $('g-send').onclick = enviarRegistro;
   }
   async function enviarRegistro() {
     const nom = $('g-nom').value.trim(), doc = $('g-doc').value.replace(/\D/g, ''), veh = $('g-veh').value;
+    if (!$('g-acepto').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» con los términos para registrarte');
     if (nom.length < 3) return mostrarToast('Poné tu nombre completo');
     if (doc.length < 6) return mostrarToast('Revisá el número de documento');
     if (!R.dni) return mostrarToast('Falta la foto del DNI');
@@ -108,13 +130,17 @@
     try {
       const ses = (await _sb.auth.getSession()).data.session;
       if (!ses || ses.user.is_anonymous) throw new Error('Tu sesión de Google se perdió. Volvé a ingresar.');
+      const ac = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'repartidor', p_version: TERMINOS_VERSION });
+      if (ac.error) throw new Error('Guardando aceptación de términos: ' + ac.error.message);
       const uid = ses.user.id, t = Date.now();
       const pDni = uid + '/dni-' + t + '.jpg', pRos = uid + '/rostro-' + t + '.jpg';
       let r = await _sb.storage.from('ne-dni').upload(pDni, R.dni, { contentType: 'image/jpeg' });
       if (r.error) throw new Error('Subiendo DNI: ' + r.error.message);
       r = await _sb.storage.from('ne-rostros').upload(pRos, R.rostro, { contentType: 'image/jpeg' });
       if (r.error) throw new Error('Subiendo foto de rostro: ' + r.error.message);
-      r = await _sb.from('ne_repartidores').insert({ user_id: uid, nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos });
+      r = (R.perfil && R.perfil.estado === 'eliminado')
+        ? await _sb.from('ne_repartidores').update({ nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos, estado: 'pendiente' }).eq('user_id', uid)
+        : await _sb.from('ne_repartidores').insert({ user_id: uid, nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos });
       if (r.error) throw new Error('Guardando datos: ' + r.error.message);
       mostrarToast('Registro enviado. Ahora elegí tus zonas y precios.'); R.tab = 'zonas'; pantalla();
     } catch (e) { mostrarToast('Error: ' + (e.message || e)); b.disabled = false; b.textContent = 'Enviar registro'; }
@@ -125,11 +151,11 @@
     const uid = sesion.user.id;
     if (!zonas.length) await cargarZonas();
     const [st, sg, rz, rp] = await Promise.all([
-      _sb.from('ne_settings').select('tope_simultaneos').eq('id', 1).single(),
+      _sb.from('ne_settings').select('tope_simultaneos,timeout_solicitud_min').eq('id', 1).single(),
       _sb.from('ne_precios_sugeridos').select('*'),
       _sb.from('ne_rep_zonas').select('zona_id').eq('user_id', uid),
       _sb.from('ne_rep_precios').select('*').eq('user_id', uid)]);
-    R.tope = st.data ? st.data.tope_simultaneos : 2;
+    R.tope = st.data ? st.data.tope_simultaneos : 2; R.timeout = st.data ? st.data.timeout_solicitud_min : 5;
     R.sug = {}; (sg.data || []).forEach(x => R.sug[x.zona_retiro + '-' + x.zona_entrega] = x.precio);
     R.zSel = new Set((rz.data || []).map(x => x.zona_id));
     R.precios = {}; (rp.data || []).forEach(x => R.precios[x.zona_retiro + '-' + x.zona_entrega] = x.precio);
@@ -141,11 +167,11 @@
     root().innerHTML = volver() + `
       <div class="flex items-center gap-3 mb-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(p.rostro_path || '')}?t=${Date.now() % 100000}" class="w-12 h-12 rounded-2xl object-cover bg-slate-100 border border-brand-200" alt="">
       <div class="flex-1 min-w-0"><p class="font-black text-slate-900 truncate">${esc(p.nombre)}</p><p id="r-badge" class="text-[11px] font-bold"></p></div></div>
-      <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'horarios:Horarios', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-[11px] font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
+      <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'horarios:Ajustes', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-[11px] font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
       <div id="r-cont"></div>`;
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
-    if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabHorarios(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
+    if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabAjustes(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
   }
 
   /* --- Pedidos --- */
@@ -178,7 +204,9 @@
     };
     $('r-max').onchange = async e => { const v = +e.target.value; const { error } = await _sb.from('ne_repartidores').update({ max_simultaneos: v }).eq('user_id', sesion.user.id); if (error) mostrarToast(error.message); else { R.perfil.max_simultaneos = v; pintarEstado(); } };
     refrescarPedidos();
-    R.poll = setInterval(refrescarPedidos, 8000);
+    clearInterval(R.poll); R.poll = setInterval(refrescarPedidos, 8000);
+    if (R.canal) _sb.removeChannel(R.canal);
+    R.canal = _sb.channel('rep-' + sesion.user.id).on('postgres_changes', { event: '*', schema: 'public', table: 'ne_pedidos', filter: 'repartidor_id=eq.' + sesion.user.id }, () => refrescarPedidos()).subscribe();
     R.hb = setInterval(() => { if (R.perfil.en_linea) _sb.rpc('ne_heartbeat'); }, 120000);
     if (R.perfil.en_linea) _sb.rpc('ne_heartbeat');
   }
@@ -198,16 +226,18 @@
     const { data } = await _sb.from('ne_pedidos').select('*').eq('repartidor_id', sesion.user.id)
       .in('estado', ['solicitado', 'aceptado', 'en_camino_retiro', 'retirado']).order('creado');
     const L = data || []; R.activos = L.filter(x => x.estado !== 'solicitado').length; pintarEstado();
+    const sol = L.filter(x => x.estado === 'solicitado');
+    if (!sol.length) cerrarSolicitud(); else if (!solActual || !sol.some(x => x.id === solActual.id)) mostrarSolicitud(sol[0]);
     const box = $('r-lista'); if (!box) return; box.innerHTML = '';
     if (!L.length) { box.innerHTML = '<p class="text-center text-xs text-slate-400 py-6">No tenés pedidos en este momento.</p>'; return; }
     L.forEach(o => {
-      const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 space-y-2';
-      d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="text-lg text-brand-600">${money(o.precio)}</b></div>
-        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>
+      const d = document.createElement('div'); d.className = 'clean-card rounded-3xl space-y-2 ' + (o.estado === 'solicitado' ? 'p-5 border-4 border-amber-400' : 'p-4');
+      d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="${o.estado === 'solicitado' ? 'text-3xl' : 'text-lg'} text-brand-600">${money(o.precio)}</b></div>
+        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}
         ${o.comercio ? `<p class="text-[11px] text-slate-400">Comercio: ${esc(o.comercio)}</p>` : ''}<p class="text-[11px] text-slate-400">Cliente: ${esc(o.cliente_nombre)}</p>
         <div class="flex gap-2 pt-1" data-acc></div>`;
       const acc = d.querySelector('[data-acc]');
-      const mk = (t, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-1 text-xs font-black rounded-xl py-2.5 active:scale-95 ' + cls; b.textContent = t; b.onclick = async () => { b.disabled = true; await fn(); b.disabled = false; }; acc.appendChild(b); };
+      const mk = (t, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-1 font-black rounded-xl active:scale-95 ' + (o.estado === 'solicitado' ? 'text-base py-4 ' : 'text-xs py-2.5 ') + cls; b.textContent = t; b.onclick = async () => { b.disabled = true; await fn(); b.disabled = false; }; acc.appendChild(b); };
       if (o.estado === 'solicitado') {
         mk('Aceptar', 'bg-brand-600 text-white', async () => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: true }); if (error) mostrarToast(error.message); refrescarPedidos(); });
         mk('Rechazar', 'bg-slate-100 text-slate-700', async () => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: false }); if (error) mostrarToast(error.message); refrescarPedidos(); });
@@ -219,6 +249,93 @@
     });
   }
 
+  /* --- Pedido nuevo: ventana grande y llamativa --- */
+  let solActual = null, solTimer = null; const vistas = new Set();
+  function pitar() {
+    try {
+      const A = window.AudioContext || window.webkitAudioContext, a = new A();
+      [880, 660, 880].forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * 0.22;
+        o.frequency.value = f; o.connect(g); g.connect(a.destination); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.start(t); o.stop(t + 0.21); });
+    } catch (e) {}
+  }
+  function modalSol() {
+    let m = $('modal-sol');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'modal-sol';
+      m.className = 'fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[70]';
+      m.innerHTML = '<style>@keyframes nepulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.75)}50%{box-shadow:0 0 0 16px rgba(245,158,11,0)}}</style><div id="sol-card" class="bg-white w-full max-w-md rounded-3xl p-6 border-4 border-amber-400 space-y-3" style="animation:nepulse 1.2s infinite"></div>';
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  function cerrarSolicitud() { clearInterval(solTimer); solActual = null; const m = $('modal-sol'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
+  function mostrarSolicitud(o) {
+    cerrarSolicitud(); solActual = o;
+    if (!vistas.has(o.id)) { vistas.add(o.id); try { navigator.vibrate && navigator.vibrate([400, 150, 400, 150, 400]); } catch (e) {} pitar(); }
+    const m = modalSol(), c = $('sol-card');
+    c.innerHTML = `<p class="text-center text-2xl font-black text-amber-600">🔔 ¡NUEVO PEDIDO!</p>
+      <p id="sol-cuenta" class="text-center text-lg font-black text-slate-700"></p>
+      <p class="text-center text-5xl font-black text-brand-600">${money(o.precio)}</p>
+      <div class="space-y-1.5"><p class="text-base text-slate-800">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-base text-slate-800">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>
+      ${o.comercio ? `<p class="text-sm text-slate-500">Comercio: ${esc(o.comercio)}</p>` : ''}</div>
+      <div class="bg-amber-50 rounded-2xl p-3 space-y-1">${resumenPago(o, false)}</div>
+      <button id="sol-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-xl rounded-2xl py-5 shadow-lg active:scale-[.98]">ACEPTAR</button>
+      <button id="sol-no" type="button" class="w-full bg-slate-100 text-slate-700 font-black text-base rounded-2xl py-3 active:scale-95">Rechazar</button>`;
+    m.classList.remove('hidden'); m.classList.add('flex');
+    const fin = new Date(o.creado).getTime() + (R.timeout || 5) * 60000;
+    const tick = () => { const s = Math.max(0, Math.round((fin - Date.now()) / 1000)); const e = $('sol-cuenta'); if (e) e.textContent = 'Respondé en ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s <= 0) { cerrarSolicitud(); refrescarPedidos(); } };
+    tick(); solTimer = setInterval(tick, 1000);
+    const responder = async acepta => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: acepta }); if (error) mostrarToast(error.message); cerrarSolicitud(); refrescarPedidos(); };
+    $('sol-ok').onclick = () => responder(true); $('sol-no').onclick = () => responder(false);
+  }
+
+  /* --- Cobros (configuración del repartidor) --- */
+  function cobrosCard(c) {
+    const p = R.perfil, ef = p.acepta_efectivo !== false, tr = !!p.acepta_transferencia, ad = !!p.adelanta_pagos, mom = p.momento_cobro || 'entrega';
+    const sel = v => mom === v ? 'selected' : '';
+    c.innerHTML = card(`<p class="font-black">Cobros</p>
+      <p class="text-[11px] text-slate-500">Elegí cómo cobrás. Los clientes solo te ven si lo que piden coincide con lo que aceptás.</p>
+      <label class="flex items-center gap-2 text-sm font-bold"><input id="c-ef" type="checkbox" class="w-5 h-5" ${ef ? 'checked' : ''}> Acepto efectivo</label>
+      <label class="flex items-center gap-2 text-sm font-bold"><input id="c-tr" type="checkbox" class="w-5 h-5" ${tr ? 'checked' : ''}> Acepto transferencia</label>
+      <div id="c-alias-box" class="${tr ? '' : 'hidden'}"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Tu alias o CBU para transferencias</label>
+        <input id="c-alias" maxlength="60" value="${esc(p.alias_pago || '')}" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="alias.ejemplo"></div>
+      <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo cobrás el envío?</label>
+        <select id="c-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="entrega" ${sel('entrega')}>En la entrega</option><option value="retiro" ${sel('retiro')}>En el retiro</option><option value="ambos" ${sel('ambos')}>Cualquiera (elige el cliente)</option></select></div>
+      <label class="flex items-start gap-2 text-sm font-bold"><input id="c-ad" type="checkbox" class="w-5 h-5 mt-0.5" ${ad ? 'checked' : ''}> <span>Manejo efectivo: puedo pagar el pedido en el comercio y cobrárselo al cliente en la entrega</span></label>
+      <div id="c-ad-box" class="${ad ? '' : 'hidden'}"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto máximo que puedo adelantar ($)</label>
+        <input id="c-max" type="number" min="1" inputmode="numeric" value="${Number(p.max_adelanto || '') || ''}" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 20000"></div>
+      ${btn('c-save', 'Guardar cobros')}`);
+    $('c-tr').onchange = e => $('c-alias-box').classList.toggle('hidden', !e.target.checked);
+    $('c-ad').onchange = e => $('c-ad-box').classList.toggle('hidden', !e.target.checked);
+    $('c-save').onclick = async () => {
+      const ef2 = $('c-ef').checked, tr2 = $('c-tr').checked, ad2 = $('c-ad').checked, alias = $('c-alias').value.trim(), mx = Math.round(parseFloat($('c-max').value) || 0);
+      if (!ef2 && !tr2) return mostrarToast('Aceptá al menos efectivo o transferencia');
+      if (tr2 && alias.length < 3) return mostrarToast('Poné tu alias o CBU para recibir transferencias');
+      if (ad2 && !(mx > 0 && mx <= 1000000)) return mostrarToast('Poné el monto máximo que podés adelantar');
+      const cambios = { acepta_efectivo: ef2, acepta_transferencia: tr2, alias_pago: tr2 ? alias : null, momento_cobro: $('c-mom').value, adelanta_pagos: ad2, max_adelanto: ad2 ? mx : 0 };
+      const { error } = await _sb.from('ne_repartidores').update(cambios).eq('user_id', sesion.user.id);
+      if (error) return mostrarToast('Error: ' + error.message);
+      Object.assign(R.perfil, cambios); mostrarToast('Cobros guardados');
+    };
+  }
+  function eliminarCard(c) {
+    c.innerHTML = card(`<p class="font-black text-rose-600">Eliminar mi perfil de repartidor</p>
+      <p class="text-[11px] text-slate-500">Se borran tu DNI, tu foto, tus zonas y tus precios. Tus pedidos pasados quedan registrados sin tus datos personales. Tu cuenta de Google no se elimina. Si más adelante querés volver, te registrás de nuevo y esperás la aprobación.</p>
+      ${btn('del-btn', 'Eliminar mi perfil', 'w-full bg-rose-50 border border-rose-200 text-rose-600 font-black text-sm rounded-2xl py-3 active:scale-[.98]')}`);
+    $('del-btn').onclick = async () => {
+      if ((prompt('Para confirmar, escribí ELIMINAR (en mayúsculas):') || '').trim() !== 'ELIMINAR') return mostrarToast('No se eliminó nada');
+      const uid = sesion.user.id;
+      const { error } = await _sb.rpc('ne_eliminar_repartidor', { p_user: uid });
+      if (error) return mostrarToast('No se pudo eliminar: ' + error.message);
+      await borrarArchivosRep(uid);
+      detener(); R.perfil = null; R.tab = 'pedidos'; mostrarToast('Tu perfil fue eliminado'); pantalla();
+    };
+  }
+  async function tabAjustes() {
+    $('r-cont').innerHTML = '<div id="aj-cob"></div><div id="aj-hor" class="mt-3"></div><div id="aj-del" class="mt-3"></div>';
+    cobrosCard($('aj-cob')); eliminarCard($('aj-del')); await tabHorarios();
+  }
+
   /* --- Horarios --- */
   function fmtProximo(iso) {
     if (!iso) return null;
@@ -228,7 +345,7 @@
   }
   const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];   // posición + 1 = día ISO
   async function tabHorarios() {
-    const c = $('r-cont'); c.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
+    const c = $('aj-hor'); c.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
     const { data, error } = await _sb.from('ne_horarios').select('*').eq('repartidor_id', sesion.user.id).order('desde');
     if (error) { c.textContent = 'Error: ' + error.message; return; }
     const h0 = data[0] || null, sel = new Set(h0 ? h0.dias : [1, 2, 3, 4, 5, 6, 7]);
@@ -273,7 +390,7 @@
       `<div id="z-precios" class="mt-3"></div>`;
     if (R.mapa) { R.mapa.remove(); R.mapa = null; }
     R.mapa = L.map('rep-mapa').setView([-38.56, -58.74], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(R.mapa);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(R.mapa);
     zonas.forEach(z => {
       const col = rgbaOk(z.color);
       const lay = L.geoJSON(z.geojson, { style: () => estiloZ(z, col) }).bindTooltip(z.nombre, { sticky: true }).addTo(R.mapa);
@@ -339,6 +456,18 @@
       d.innerHTML = `<div class="flex justify-between"><b class="${x.estado === 'entregado' ? 'text-brand-700' : 'text-rose-600'}">${esc(ESTADOS[x.estado])}</b><b>${money(x.precio)}</b></div><p class="text-slate-500 truncate">${esc(fixDir(x.retiro_dir))} → ${esc(fixDir(x.entrega_dir))}</p><p class="text-[10px] text-slate-400">${new Date(x.creado).toLocaleString('es-AR')}</p>`;
       $('h-lista').appendChild(d); });
   }
+
+  /* --- Al abrir la app: si ya es repartidor registrado, entra directo a su perfil --- */
+  (async () => {
+    const sp = new URLSearchParams(location.search);
+    if (sp.has('retiro') || sp.has('entrega') || sp.has('rep') || localStorage.getItem('ne_volver') === 'rep') return;
+    try {
+      const { data } = await _sb.auth.getSession(); const s = data.session;
+      if (!s || s.user.is_anonymous) return;
+      const q = await _sb.from('ne_repartidores').select('user_id,estado').eq('user_id', s.user.id).maybeSingle();
+      if (q.data && q.data.estado !== 'eliminado') irRepartidor();
+    } catch (e) {}
+  })();
 
   /* --- Volver de Google --- */
   if (localStorage.getItem('ne_volver') === 'rep') {

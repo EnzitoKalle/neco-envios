@@ -43,12 +43,15 @@
   async function tRep() {
     $('ad-cont').innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>'; await cargarReps();
     const box = $('ad-cont'); box.innerHTML = '';
-    if (!A.reps.length) { box.innerHTML = '<p class="text-xs text-slate-400">Todavía no hay repartidores registrados.</p>'; return; }
-    A.reps.forEach(r => {
+    const visibles = A.reps.filter(r => r.estado !== 'eliminado');
+    const ac = await _sb.from('ne_aceptaciones').select('user_id,version,aceptado_en').eq('tipo', 'repartidor').order('aceptado_en'); const acep = {}; (ac.data || []).forEach(x => acep[x.user_id] = x);
+    if (!visibles.length) { box.innerHTML = '<p class="text-xs text-slate-400">Todavía no hay repartidores registrados.</p>'; return; }
+    visibles.forEach(r => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-2xl p-3 mb-2 space-y-2';
       const col = { pendiente: 'bg-amber-100 text-amber-700', aprobado: 'bg-brand-100 text-brand-700', pausado: 'bg-slate-200 text-slate-600' }[r.estado];
       d.innerHTML = `<div class="flex items-center gap-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path || '')}" class="w-12 h-12 rounded-xl object-cover bg-slate-100" alt="">
-        <div class="flex-1 min-w-0"><p class="font-black text-sm truncate">${esc(r.nombre)}</p><p class="text-[11px] text-slate-500">DNI ${esc(r.documento)} · ${esc(r.vehiculo)} · ${r.en_linea ? '🟢 en línea' : '⚪ desconectado'}</p></div>
+        <div class="flex-1 min-w-0"><p class="font-black text-sm truncate">${esc(r.nombre)}</p><p class="text-[11px] text-slate-500">DNI ${esc(r.documento)} · ${esc(r.vehiculo)} · ${r.en_linea ? '🟢 en línea' : '⚪ desconectado'}</p>
+        <p class="text-[11px] ${acep[r.user_id] ? 'text-slate-400' : 'text-amber-600 font-bold'}">${acep[r.user_id] ? '✓ Aceptó los términos el ' + esc(new Date(acep[r.user_id].aceptado_en).toLocaleString('es-AR')) + ' (versión ' + esc(acep[r.user_id].version) + ')' : '⚠ Todavía no aceptó los términos'}</p></div>
         <span class="text-[10px] font-black px-2 py-1 rounded-full ${col}">${esc(r.estado)}</span></div>
         <div class="flex flex-wrap gap-2" data-b></div><div data-fotos class="hidden"></div>`;
       const bx = d.querySelector('[data-b]');
@@ -64,6 +67,13 @@
       if (r.estado === 'pendiente') add('Aprobar', 'bg-brand-600 text-white', () => cambiar('aprobado'));
       if (r.estado === 'aprobado') add('Pausar', 'bg-amber-100 text-amber-700', () => cambiar('pausado'));
       if (r.estado === 'pausado') add('Reactivar', 'bg-brand-600 text-white', () => cambiar('aprobado'));
+      add('Eliminar', 'bg-rose-50 text-rose-600 border border-rose-200', async () => {
+        if (!confirm('¿Eliminar a ' + r.nombre + '? Se borran su DNI, su foto, sus zonas y sus precios. Los pedidos y comisiones pasadas quedan registrados sin sus datos personales. Esto no se puede deshacer.')) return;
+        const { error } = await _sb.rpc('ne_eliminar_repartidor', { p_user: r.user_id });
+        if (error) return mostrarToast('No se pudo eliminar: ' + error.message);
+        const fallos = await borrarArchivosRep(r.user_id);
+        mostrarToast(fallos ? 'Eliminado, pero quedaron archivos sin borrar: revisá Storage' : 'Repartidor eliminado'); tRep();
+      });
       box.appendChild(d);
     });
   }
@@ -140,8 +150,8 @@
     const nom = {}; A.reps.forEach(r => nom[r.user_id] = r.nombre);
     const { data, error } = await _sb.from('ne_pedidos').select('*').order('creado', { ascending: false }).limit(150);
     if (error) { $('ad-cont').textContent = error.message; return; }
-    let h = `<div class="overflow-x-auto"><table class="w-full"><thead><tr><th class="${th}">Fecha</th><th class="${th}">Estado</th><th class="${th}">Repartidor</th><th class="${th}">Recorrido</th><th class="${th}">Precio</th></tr></thead><tbody>`;
-    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</td><td class="${td} font-black">${money(p.precio)}</td></tr>`);
+    let h = `<div class="overflow-x-auto"><table class="w-full"><thead><tr><th class="${th}">Fecha</th><th class="${th}">Estado</th><th class="${th}">Repartidor</th><th class="${th}">Recorrido</th><th class="${th}">Precio</th><th class="${th}">Pago</th></tr></thead><tbody>`;
+    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</td><td class="${td} font-black">${money(p.precio)}</td><td class="${td}">${esc(p.pago_envio_metodo || "efectivo")} · ${p.pago_envio_momento === "retiro" ? "retiro" : "entrega"}${Number(p.adelanto_monto) > 0 ? " · adelanto " + money(p.adelanto_monto) : ""}</td></tr>`);
     $('ad-cont').innerHTML = h + '</tbody></table></div>';
   }
 })();

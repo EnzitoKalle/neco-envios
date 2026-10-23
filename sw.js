@@ -1,5 +1,5 @@
 /* NECO ENVÍOS - Service worker. Sube el número de VERSION cuando cambies archivos. */
-const VERSION = 'ne-v3';
+const VERSION = 'ne-v4';
 const SHELL = ['/', '/index.html', '/repartidor.js', '/admin.js', '/push.js', '/manifest.json', '/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -19,5 +19,10 @@ self.addEventListener('push', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => { for (const c of l) if ('focus' in c) return c.focus(); return clients.openWindow(e.notification.data.url || '/'); }));
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const lista = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of lista) { if ('focus' in c) { await c.focus(); c.postMessage({ url }); return; } }
+    await clients.openWindow(url);
+  })());
 });
