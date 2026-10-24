@@ -12,7 +12,7 @@
   async function salir() { if (!confirm('¿Cerrar sesión de Google?')) return; localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); }
   root().addEventListener('click', e => { if (e.target.closest('[data-salir]')) salir(); });
 
-  function detener() { detenerUbicacion(false); clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
+  function detener() { detenerUbicacion(false); clearInterval(R.seg); clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
   function cerrarCamara() { if (R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; } }
 
   window.irRepartidor = async function () { vista('repartidor'); await pantalla(); };
@@ -172,6 +172,7 @@
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
     $('r-badge').textContent = p.comparte_ubicacion ? '📍 Seguimiento en vivo activado' : ''; $('r-badge').className = 'text-[11px] font-bold text-brand-600';
+    clearInterval(R.seg); R.seg = setInterval(revisarSeguimiento, 15000); revisarSeguimiento();
     if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabAjustes(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
   }
 
@@ -421,8 +422,17 @@
   function iniciarUbicacion() {
     if (geoId !== null || !navigator.geolocation) return;
     geoId = navigator.geolocation.watchPosition(pos => {
-      _sb.rpc('ne_publicar_ubicacion', { p_lat: pos.coords.latitude, p_lng: pos.coords.longitude, p_precision: Math.round(pos.coords.accuracy || 0) });
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+      _sb.rpc('ne_publicar_ubicacion', { p_lat: pos.coords.latitude, p_lng: pos.coords.longitude, p_precision: Math.round(pos.coords.accuracy || 0) }).then(x => {
+        const b = $('r-badge'); if (!b) return;
+        b.textContent = x.error ? '⚠ No se pudo compartir tu ubicación: ' + x.error.message : x.data ? '📍 Compartiendo tu ubicación con el cliente' : '⚠ Tu ubicación no se pudo compartir (¿estás dentro de la zona?)';
+      });
+    }, () => { const b = $('r-badge'); if (b) b.textContent = '⚠ No llega tu ubicación: revisá el permiso de ubicación del navegador'; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }
+  // Revisa cada 15 s (en cualquier pestaña) si hay que seguir la posición: opción activada + pedido en curso
+  async function revisarSeguimiento() {
+    if (!R.perfil || !R.perfil.comparte_ubicacion) { if (geoId !== null) detenerUbicacion(true); return; }
+    const q = await _sb.from('ne_pedidos').select('id').eq('repartidor_id', sesion.user.id).in('estado', ['aceptado', 'en_camino_retiro', 'retirado']);
+    if (q.data && q.data.length) iniciarUbicacion(); else if (geoId !== null) detenerUbicacion(true);
   }
   function ubicacionCard(c) {
     const on = !!R.perfil.comparte_ubicacion;
@@ -435,7 +445,7 @@
         const { error } = await _sb.from('ne_repartidores').update({ comparte_ubicacion: v }).eq('user_id', sesion.user.id);
         if (error) { $('ubi-chk').checked = !v; return mostrarToast('Error: ' + error.message); }
         R.perfil.comparte_ubicacion = v;
-        if (!v) detenerUbicacion(true);
+        if (!v) detenerUbicacion(true); else revisarSeguimiento();
         mostrarToast(v ? 'Seguimiento en vivo activado 📍' : 'Seguimiento en vivo desactivado');
       };
       if (!quiere) return guardar(false);

@@ -659,15 +659,19 @@ function pintarRep(){
 }
 // Dónde está mi repartidor (solo si él activó el seguimiento en vivo y el pedido está en curso)
 async function actualizarUbicacion(data){
-  const box = $('ch-mapa-box');
-  const activo = ['aceptado','en_camino_retiro','retirado'].includes(data.estado);
-  if (!(chatRep && chatRep.comparte && activo)) { box.classList.add('hidden'); return; }
+  const box = $('ch-mapa-box'), mp = $('ch-mapa');
+  if (!['aceptado','en_camino_retiro','retirado'].includes(data.estado)) { box.classList.add('hidden'); return; }
   let u = null; try { const r = await _sb.rpc('ne_ubicacion_repartidor', { p_pedido: data.id }); u = r.data; } catch (e) {}
-  if (!u || u.lat == null || chatId !== data.id) { box.classList.add('hidden'); return; }
+  if (chatId !== data.id) return;
+  if (!u || u.lat == null) {
+    if (chatRep && chatRep.comparte) { box.classList.remove('hidden'); mp.classList.add('hidden'); $('ch-mapa-txt').textContent = '📍 Tu repartidor tiene el seguimiento activado. Esperando su ubicación…'; }
+    else box.classList.add('hidden');
+    return;
+  }
   const seg = Math.max(0, Math.round((Date.now() - new Date(u.actualizado).getTime()) / 1000));
   const haciaEntrega = data.estado === 'retirado';
   const dest = haciaEntrega ? [Number(data.entrega_lat), Number(data.entrega_lng)] : [Number(data.retiro_lat), Number(data.retiro_lng)];
-  box.classList.remove('hidden');
+  box.classList.remove('hidden'); mp.classList.remove('hidden');
   if (!mapaChat) { mapaChat = L.map('ch-mapa', { zoomControl: false }); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaChat); capaChat = L.layerGroup().addTo(mapaChat); }
   capaChat.clearLayers();
   L.marker([u.lat, u.lng], { icon: mkIcon('#0b6e5a', '🏍️') }).addTo(capaChat);
