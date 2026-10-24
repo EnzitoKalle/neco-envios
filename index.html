@@ -664,7 +664,7 @@ async function actualizarUbicacion(data){
   let u = null; try { const r = await _sb.rpc('ne_ubicacion_repartidor', { p_pedido: data.id }); u = r.data; } catch (e) {}
   if (chatId !== data.id) return;
   if (!u || u.lat == null) {
-    if (chatRep && chatRep.comparte) { box.classList.remove('hidden'); mp.classList.add('hidden'); $('ch-mapa-txt').textContent = '📍 Tu repartidor tiene el seguimiento activado. Esperando su ubicación…'; }
+    if (chatRep && chatRep.comparte) { box.classList.remove('hidden'); mp.classList.add('hidden'); $('ch-mapa-txt').textContent = '📍 Tu repartidor tiene el seguimiento activado. Esperando su ubicación… (necesita tener la app abierta en pantalla, con el pedido aceptado)'; }
     else box.classList.add('hidden');
     return;
   }
