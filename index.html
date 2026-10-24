@@ -29,12 +29,12 @@ tailwind.config = { theme: { extend: {
 }}}
 </script>
 <style>
-body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b;overflow-x:hidden}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b;overflow-x:hidden}
 .clean-nav{background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-bottom:1px solid #e2e8f0}
-.clean-card{background:#fff;border:1px solid #e2e8f0;box-shadow:0 2px 12px -2px rgba(0,0,0,.04);transition:all .2s ease-in-out}
+.clean-card{background:#fff;border:1px solid #ebe5d8;box-shadow:0 3px 14px -3px rgba(120,90,30,.08);transition:all .2s ease-in-out}
 .clean-card:hover{border-color:#a3e4d0;box-shadow:0 8px 20px -4px rgba(0,0,0,.08)}
 .clean-modal{background:#fff;border:1px solid #e2e8f0;box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
-.clean-input{background:#f8fafc;border:1px solid #cbd5e1;color:#0f172a}
+.clean-input{background:#fcfaf6;border:1px solid #d9d2c3;color:#0f172a}
 .clean-input:focus{border-color:#12896f;background:#fff;box-shadow:0 0 0 3px rgba(18,137,111,.15);outline:none}
 .custom-scrollbar::-webkit-scrollbar{display:none}.custom-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
 @keyframes toastSlide{0%{transform:translateY(100px);opacity:0}100%{transform:translateY(0);opacity:1}}
@@ -43,6 +43,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
 .modal-bottom-sheet>div{border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;max-height:88vh!important}}
 #mapa{height:260px;border-radius:1rem;z-index:0}
 .suger{max-height:170px;overflow-y:auto}
+.neco-conf{position:absolute;top:-40px;animation:necoconf 2.8s ease-in forwards}
+@keyframes necoconf{to{transform:translateY(112vh) rotate(380deg);opacity:.9}}
+.neco-moto{display:inline-block;animation:necobounce 1.2s ease-in-out infinite}
+@keyframes necobounce{50%{transform:translateY(-3px)}}
+@keyframes necofade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#v-inicio>*{animation:necofade .5s ease both}#v-inicio>*:nth-child(2){animation-delay:.08s}#v-inicio>*:nth-child(3){animation-delay:.16s}#v-inicio>*:nth-child(4){animation-delay:.24s}
 </style>
 </head>
 <body class="antialiased pb-28 min-h-screen selection:bg-brand-500 selection:text-white">
@@ -78,8 +84,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
   <!-- INICIO -->
   <section id="v-inicio" class="space-y-4">
     <div class="text-center pt-2 pb-1">
-      <h2 class="text-2xl font-black text-slate-900">¿Qué necesitás hoy?</h2>
-      <p class="text-sm text-slate-500 mt-1">Repartidores de Necochea y Quequén, a tu precio y en tiempo real.</p>
+      <img src="icon-192.png" alt="" class="w-16 h-16 mx-auto rounded-2xl shadow-md mb-2">
+      <h2 id="saludo" class="text-2xl font-black text-slate-900">¡Hola! ¿Qué necesitás hoy?</h2>
+      <p class="text-sm text-slate-500 mt-1">Tu envío en Necochea y Quequén, en minutos y con repartidores de acá.</p>
     </div>
     <button onclick="irCliente()" type="button" class="clean-card w-full rounded-3xl p-6 text-left flex items-center gap-4 active:scale-[.98]">
       <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-400 text-white flex items-center justify-center shadow-md"><i data-lucide="package" class="w-7 h-7"></i></div>
@@ -91,6 +98,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
       <div class="flex-1"><h3 class="font-black text-lg text-slate-900">Unirme como repartidor</h3><p class="text-xs text-slate-500">Elegí tus zonas, poné tu precio y ganá.</p></div>
       <i data-lucide="arrow-right" class="w-5 h-5 text-brand-500"></i>
     </button>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-white rounded-2xl p-3 border border-amber-100"><div class="text-xl">🛡️</div><p class="text-[11px] font-black text-slate-700 leading-tight mt-1">Repartidores verificados</p></div>
+      <div class="bg-white rounded-2xl p-3 border border-amber-100"><div class="text-xl">💵</div><p class="text-[11px] font-black text-slate-700 leading-tight mt-1">Pagás directo al repartidor</p></div>
+      <div class="bg-white rounded-2xl p-3 border border-amber-100"><div class="text-xl">💬</div><p class="text-[11px] font-black text-slate-700 leading-tight mt-1">Chat con tu repartidor</p></div>
+    </div>
   </section>
 
   <!-- CLIENTE -->
@@ -119,6 +131,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
           <button id="btn-buscar" type="button" title="Ubicar dirección" class="bg-brand-600 text-white rounded-xl px-3.5 active:scale-95"><i data-lucide="search" class="w-4 h-4"></i></button></div>
         <p id="dir-est" class="text-[11px] text-amber-600 font-bold mt-1"></p>
         <button id="btn-usar-texto" type="button" class="hidden mt-1 text-[11px] font-black text-brand-700 underline text-left">Usar lo que escribí como dirección (con el pin actual)</button>
+        <div id="dir-guardadas" class="flex flex-wrap gap-1.5 mt-2"></div>
+        <button id="btn-guardar-dir" type="button" class="hidden mt-1 text-[11px] font-black text-amber-700 underline text-left">💾 Guardar esta dirección (Casa, Trabajo…)</button>
         <div id="dir-elegir" class="hidden flex gap-2 mt-2"><button id="btn-pin-a" type="button" class="flex-1 bg-brand-600 text-white text-xs font-black rounded-xl py-2.5 active:scale-95">Dejar mi pin</button><button id="btn-pin-b" type="button" class="flex-1 bg-slate-600 text-white text-xs font-black rounded-xl py-2.5 active:scale-95">Usar el pin gris (?)</button></div>
         <button id="btn-confirmar" type="button" class="hidden w-full mt-2 bg-brand-600 text-white font-black text-sm rounded-xl py-2.5 active:scale-95">✓ El pin está bien ubicado</button>
         <div id="sugerencias" class="suger hidden mt-1 bg-white border border-slate-200 rounded-xl shadow-lg"></div>
@@ -156,9 +170,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#f6faf8;color:#1e293b
       <div class="min-w-0"><h3 class="text-base font-black text-slate-900">Tu pedido</h3><span id="ch-estado" class="inline-block mt-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-brand-100 text-brand-700"></span></div>
       <button onclick="cerrarChat()" type="button" class="p-1 rounded-full text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
+    <div id="ch-rep" class="hidden flex items-center gap-3 bg-brand-50 rounded-2xl p-2.5"></div>
+    <div id="ch-pasos" class="hidden"></div>
     <div id="ch-info" class="text-[11px] text-slate-500 space-y-0.5"></div>
     <div id="ch-msgs" class="custom-scrollbar flex-1 min-h-[180px] max-h-[40vh] overflow-y-auto bg-slate-50 rounded-2xl p-3 space-y-2"></div>
     <div id="ch-acciones" class="space-y-2"></div>
+    <div id="ch-rapidas" class="flex gap-1.5 overflow-x-auto custom-scrollbar"></div>
     <div id="ch-form" class="flex gap-2">
       <input id="ch-input" maxlength="1000" class="clean-input flex-1 rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí un mensaje...">
       <button onclick="enviarMsg()" type="button" class="bg-brand-600 text-white rounded-xl px-4 active:scale-95"><i data-lucide="send" class="w-4 h-4"></i></button>
@@ -202,7 +219,13 @@ function mostrarToast(m){ $('toast-txt').textContent = m; $('toast').classList.r
 function abrirModal(id){ $(id).classList.remove('hidden'); ico(); }
 function cerrarModal(id){ $(id).classList.add('hidden'); }
 function vista(v){ ['inicio','cliente','repartidor'].forEach(x => $('v-'+x).classList.toggle('hidden', x!==v)); window.scrollTo(0,0); }
-function irInicio(){ vista('inicio'); }
+function saludar(){
+  const h = new Date().getHours(), t = h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+  let n = ''; try { n = (localStorage.getItem('ne_nombre') || '').trim().split(/\s+/)[0]; } catch (e) {}
+  $('saludo').textContent = '¡' + t + (n ? ', ' + n : '') + '! ¿Qué necesitás hoy?';
+}
+function irInicio(){ vista('inicio'); saludar(); }
+const ESTADOS_CLI = { solicitado:'Esperando que el repartidor acepte', aceptado:'¡Tu repartidor aceptó!', en_camino_retiro:'Va camino al retiro', retirado:'Ya lo retiró y va para tu casa', entregado:'¡Entregado! 🎉', cancelado:'Cancelado', rechazado:'No pudo tomarlo', vencido:'Sin respuesta' };
 const ESTADOS = { solicitado:'Esperando al repartidor', aceptado:'Pedido aceptado', en_camino_retiro:'En camino al retiro', retirado:'Retirado, en camino a la entrega', entregado:'Entregado', cancelado:'Cancelado', rechazado:'Rechazado', vencido:'Vencido' };
 const CANCELABLES = ['solicitado'];   // solo se puede cancelar antes de que el repartidor acepte
 const ABIERTOS = ['solicitado','aceptado','en_camino_retiro','retirado'];
@@ -388,6 +411,29 @@ async function buscarNumerica(p){
   const [A, B] = await Promise.all([getA(), getB()]);
   return { A, B };
 }
+let guardadas = [];
+async function cargarGuardadas(){ try { const { data } = await _sb.from('ne_direcciones').select('id,nombre,dir,lat,lng').order('id'); guardadas = Array.isArray(data) ? data : []; } catch (e) { guardadas = []; } pintarGuardadas(); }
+function pintarGuardadas(){
+  const box = $('dir-guardadas'); box.innerHTML = '';
+  guardadas.forEach(g => {
+    const w = document.createElement('span'); w.className = 'inline-flex items-center bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-800';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'px-3 py-1.5'; b.textContent = (/casa/i.test(g.nombre) ? '🏠 ' : /trabajo/i.test(g.nombre) ? '💼 ' : '📍 ') + g.nombre; b.onclick = () => usarGuardada(g);
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'pr-2.5 text-amber-500'; x.textContent = '×'; x.title = 'Borrar';
+    x.onclick = async () => { if (!confirm('¿Borrar «' + g.nombre + '»?')) return; await _sb.from('ne_direcciones').delete().eq('id', g.id); cargarGuardadas(); };
+    w.appendChild(b); w.appendChild(x); box.appendChild(w);
+  });
+  revisarTexto();
+}
+function usarGuardada(g){ mapa.setView([g.lat, g.lng], 16); ponerPunto(activo, g.lat, g.lng, g.dir, false, true); setEst('✅ Usando «' + g.nombre + '». Si algo cambió, mové el pin.', true); }
+async function guardarDirActual(){
+  const c = pts[activo]; if (!c || c.dir === PUNTO) return;
+  if (guardadas.length >= 8) return mostrarToast('Ya tenés 8 direcciones guardadas: borrá alguna con la ×');
+  const sug = guardadas.some(g => /casa/i.test(g.nombre)) ? (guardadas.some(g => /trabajo/i.test(g.nombre)) ? '' : 'Trabajo') : 'Casa';
+  const nombre = (prompt('¿Con qué nombre la guardamos? (ej: Casa, Trabajo, Local)', sug) || '').trim().slice(0, 30); if (!nombre) return;
+  const { error } = await _sb.from('ne_direcciones').insert({ user_id: sesion.user.id, nombre, dir: c.dir, lat: c.lat, lng: c.lng });
+  if (error) return mostrarToast('No se pudo guardar: ' + error.message);
+  mostrarToast('¡Guardada! 💚'); cargarGuardadas();
+}
 let sugT, busqId = 0;
 // directo = true: usa la lupa/Enter. Mientras escribe, solo sugiere si es una dirección con nombre.
 async function buscarDir(q, directo){
@@ -432,6 +478,7 @@ function revisarTexto(){
   const t = $('in-dir').value.trim(), c = pts[activo], eleg = !$('dir-elegir').classList.contains('hidden');
   $('btn-usar-texto').classList.toggle('hidden', !(c && t.length >= 3 && t !== c.dir && c.dir !== BUSCANDO));
   $('btn-confirmar').classList.toggle('hidden', !(c && !okp[activo] && c.dir !== BUSCANDO && !eleg));
+  $('btn-guardar-dir').classList.toggle('hidden', !(c && okp[activo] && c.dir !== PUNTO && c.dir !== BUSCANDO && !guardadas.some(g => g.dir === c.dir && Math.abs(g.lat - c.lat) < 1e-5)));
 }
 $('in-dir').addEventListener('input', e => { revisarTexto(); clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q, false), 700); });
 $('in-dir').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sugT); buscarDir($('in-dir').value, true); } });
@@ -439,6 +486,7 @@ $('btn-usar-texto').addEventListener('click', () => {
   const t = $('in-dir').value.trim().slice(0, 200), c = pts[activo]; if (!c || t.length < 3) return;
   const pd = parseDir(t); c.dir = (pd && pd.altura) ? pd.texto : t; $('in-dir').value = c.dir; setEst('', false); pintarResumen(); mostrarToast('Dirección guardada con el pin que marcaste');
 });
+$('btn-guardar-dir').addEventListener('click', guardarDirActual);
 $('btn-confirmar').addEventListener('click', () => { okp[activo] = true; pintarResumen(); mostrarToast('Pin confirmado'); if (activo === 'r' && !pts.e) setActivo('e'); });
 $('btn-pin-a').addEventListener('click', () => { okp[activo] = true; quitarAlt(activo); pintarResumen(); mostrarToast('Pin confirmado'); });
 $('btn-pin-b').addEventListener('click', () => usarAlt(activo));
@@ -455,6 +503,7 @@ async function irCliente(){
   if (!okSes) return;
   dibujarZonas(); ico();
   tcAceptados = await aceptoTerminos('cliente'); $('tc-box').classList.toggle('hidden', tcAceptados);
+  cargarGuardadas();
   $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
   $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
   if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
@@ -475,8 +524,8 @@ async function aplicarParams(){
 }
 async function consultar(){
   const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
-  if (nombre.length < 2) return mostrarToast('Poné tu nombre');
-  if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Poné tu WhatsApp');
+  if (nombre.length < 2) return mostrarToast('Contanos tu nombre 🙂');
+  if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Dejanos tu WhatsApp para coordinar el envío');
   if (!tcAceptados) {
     if (!$('tc-ok').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» con los términos para continuar');
     const ac = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'cliente', p_version: TERMINOS_VERSION });
@@ -510,7 +559,7 @@ function pintarRepartidores(lista){
   if (lista) ultimaLista = lista;
   lista = ultimaLista.filter(r => filtroVeh === 'todos' || r.vehiculo === filtroVeh);
   const box = $('lista-rep'); box.innerHTML = '';
-  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + (ultimaLista.length ? 'No hay repartidores con ese vehículo para este recorrido ahora. Probá con «Cualquiera».' : 'Ahora no hay repartidores disponibles para ese recorrido. Probá en unos minutos.') + '</div>'; return; }
+  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + (ultimaLista.length ? 'No hay repartidores con ese vehículo para este recorrido ahora. Probá con «Cualquiera».' : 'Ahora no hay repartidores libres para ese recorrido 😕 Probá en unos minutos, o cambiá el vehículo o la forma de pago.') + '</div>'; return; }
   lista.forEach(r => {
     const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
     const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
@@ -541,10 +590,12 @@ async function borrarArchivosRep(uid){
   return fallos;
 }
 function limpiarLista(){ ultimaLista = []; $('lista-rep').innerHTML = ''; }
+const chipsRepintar = [];
 function chipsGrupo(id, valor, alElegir){
   const bs = document.querySelectorAll('#' + id + ' [data-v]');
   const pintar = () => bs.forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === valor() ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
   bs.forEach(b => b.addEventListener('click', () => { alElegir(b.dataset.v); pintar(); limpiarLista(); }));
+  chipsRepintar.push(pintar);
   pintar();
 }
 chipsGrupo('pg-met', () => pagoMetodo, v => { pagoMetodo = v; });
@@ -585,9 +636,34 @@ async function solicitar(r, btn){
 }
 
 /* ============ CHAT DEL PEDIDO ============ */
-let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0;
+let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0, chatRep = null;
+const PASOS = [['aceptado','Aceptado'],['en_camino_retiro','En camino'],['retirado','Retirado'],['entregado','Entregado']];
+const RAP_CLI = ['Gracias 🙌','Ya te estoy esperando','Tocá el timbre, por favor','¿Cuánto falta?'];
+const RAP_REP = ['Ya llegué 🙌','Estoy en la puerta','¿Me abrís, por favor?','Gracias'];
+function pasosHTML(idx){
+  const n = PASOS.length;
+  return '<div class="relative px-1 pt-7 pb-1"><div class="absolute left-7 right-7 top-[38px] h-1 bg-slate-200 rounded"></div>' +
+    '<div class="absolute left-7 top-[38px] h-1 bg-brand-500 rounded" style="width:calc((100% - 3.5rem) * ' + idx + ' / ' + (n - 1) + ')"></div>' +
+    '<div class="relative flex justify-between">' + PASOS.map((p, i) => '<div class="flex flex-col items-center w-14">' +
+      (i === idx ? '<span class="text-xl -mt-7 neco-moto">🏍️</span>' : '<span class="h-0"></span>') +
+      '<span class="w-4 h-4 rounded-full border-2 border-white shadow ' + (i <= idx ? 'bg-brand-500' : 'bg-slate-300') + '"></span>' +
+      '<span class="text-[10px] font-bold mt-1 ' + (i <= idx ? 'text-brand-700' : 'text-slate-400') + '">' + p[1] + '</span></div>').join('') + '</div></div>';
+}
+function pintarRep(){
+  const e = $('ch-rep');
+  if (!chatRep) { e.classList.add('hidden'); return; }
+  e.classList.remove('hidden');
+  const foto = chatRep.rostro_path ? SUPABASE_URL + '/storage/v1/object/public/ne-rostros/' + encodeURI(chatRep.rostro_path) : '';
+  e.innerHTML = '<img src="' + esc(foto) + '" alt="" class="w-11 h-11 rounded-xl object-cover bg-slate-100 border border-brand-200"><div class="text-xs"><p class="font-black text-slate-900">Tu repartidor: ' + esc(chatRep.nombre) + '</p><p class="text-slate-500">' + esc(VEH[chatRep.vehiculo] || chatRep.vehiculo || '') + (Number(chatRep.cant) ? ' · ⭐ ' + Number(chatRep.calificacion).toFixed(1) : ' · Nuevo') + '</p></div>';
+}
+function celebrar(){
+  const box = document.createElement('div'); box.className = 'fixed inset-0 pointer-events-none z-[80] overflow-hidden';
+  const em = ['🎉','🏍️','✨','💚','🎊'];
+  for (let i = 0; i < 22; i++) { const x = document.createElement('span'); x.textContent = em[i % em.length]; x.className = 'neco-conf'; x.style.left = (Math.random() * 100) + '%'; x.style.animationDelay = (Math.random() * 0.8) + 's'; x.style.fontSize = (18 + Math.random() * 16) + 'px'; box.appendChild(x); }
+  document.body.appendChild(box); setTimeout(() => { try { box.remove(); } catch (e) {} }, 3600);
+}
 async function abrirChat(id){
-  chatId = id; ultimoMsg = 0; $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
+  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-rep').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
   await refrescarPedido(); await cargarMensajes();
   if (chatCanal) _sb.removeChannel(chatCanal);
   chatCanal = _sb.channel('ped-' + id)
@@ -601,11 +677,18 @@ function cerrarChat(){ cerrarModal('modal-chat'); clearInterval(chatPoll); if (c
 async function refrescarPedido(){
   if (!chatId) return;
   const { data } = await _sb.from('ne_pedidos').select('*').eq('id', chatId).single();
-  if (!data) return; chatPedido = data;
-  $('ch-estado').textContent = ESTADOS[data.estado] || data.estado;
+  if (!data) return; const antes = (chatPedido && chatPedido.id === data.id) ? chatPedido.estado : null; chatPedido = data;
+  $('ch-estado').textContent = ((sesion && data.cliente_id === sesion.user.id ? ESTADOS_CLI : ESTADOS)[data.estado]) || data.estado;
   $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(fixDir(data.retiro_dir))}</p><p>🏁 Entrega: ${esc(fixDir(data.entrega_dir))}</p>${resumenPago(data, sesion && data.cliente_id === sesion.user.id)}${sesion && data.cliente_id === sesion.user.id ? (data.estado === 'solicitado' ? '<p>ℹ️ Podés cancelar hasta que el repartidor acepte.</p>' : ABIERTOS.includes(data.estado) ? '<p>ℹ️ Pedido aceptado: ya no se puede cancelar.</p>' : '') : ''}`;
   const ac = $('ch-acciones'); ac.innerHTML = '';
   const esCli = sesion && data.cliente_id === sesion.user.id;
+  const idxPaso = PASOS.findIndex(x => x[0] === data.estado);
+  $('ch-pasos').classList.toggle('hidden', idxPaso < 0);
+  if (idxPaso >= 0) $('ch-pasos').innerHTML = pasosHTML(idxPaso);
+  if (esCli && chatRep === null) { chatRep = false; _sb.rpc('ne_info_repartidor', { p_pedido: data.id }).then(r => { chatRep = r.data || false; pintarRep(); }); } else pintarRep();
+  const rap = $('ch-rapidas'); rap.innerHTML = '';
+  if (ABIERTOS.includes(data.estado)) (esCli ? RAP_CLI : RAP_REP).forEach(t => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-shrink-0 text-xs font-bold bg-white border border-slate-200 rounded-full px-3 py-1.5 active:scale-95'; b.textContent = t; b.onclick = () => enviarMsg(t); rap.appendChild(b); });
+  if (esCli && antes && antes !== 'entregado' && data.estado === 'entregado') celebrar();
   if (esCli && data.pago_envio_metodo === 'transferencia' && ['aceptado','en_camino_retiro','retirado'].includes(data.estado)) {
     _sb.rpc('ne_datos_pago', { p_pedido: data.id }).then(r => { if (r.data && r.data.alias) $('ch-info').insertAdjacentHTML('beforeend', '<p class="text-xs">🏦 Alias para transferir: <b>' + esc(r.data.alias) + '</b></p>'); });
   }
@@ -617,13 +700,13 @@ async function refrescarPedido(){
   }
   if (esCli && data.estado === 'entregado' && !data.calificacion) {
     const w = document.createElement('div'); w.className = 'text-center';
-    w.innerHTML = '<p class="text-xs font-bold text-slate-600 mb-1">¿Cómo estuvo el envío?</p>';
-    for (let i=1;i<=5;i++){ const s = document.createElement('button'); s.type='button'; s.className='text-3xl px-0.5'; s.textContent='⭐';
-      s.onclick = async () => { const { error } = await _sb.rpc('ne_calificar', { p_pedido: chatId, p_estrellas: i }); if (error) mostrarToast(error.message); else { mostrarToast('¡Gracias por calificar!'); refrescarPedido(); } };
+    w.innerHTML = '<p class="text-sm font-black text-slate-800">¡Gracias por usar NecoEnvíos! 💚</p><p class="text-xs font-bold text-slate-600 mb-1">¿Cómo estuvo tu envío?</p>';
+    for (let i=1;i<=5;i++){ const s = document.createElement('button'); s.type='button'; s.className='text-4xl px-1 active:scale-125'; s.textContent=['😞','😕','😐','🙂','😍'][i-1]; s.title=['Muy mal','Mal','Regular','Bien','¡Excelente!'][i-1];
+      s.onclick = async () => { const { error } = await _sb.rpc('ne_calificar', { p_pedido: chatId, p_estrellas: i }); if (error) mostrarToast(error.message); else { mostrarToast('¡Gracias por tu opinión! 💚'); refrescarPedido(); } };
       w.appendChild(s); }
     ac.appendChild(w);
   }
-  if (data.calificacion) ac.innerHTML = `<p class="text-center text-xs text-slate-500">Calificación: ${'⭐'.repeat(data.calificacion)}</p>`;
+  if (data.calificacion) ac.innerHTML = `<p class="text-center text-xs text-slate-500">Calificación: ${['😞','😕','😐','🙂','😍'][data.calificacion - 1] || '⭐'}</p>`;
   $('ch-form').classList.toggle('hidden', !ABIERTOS.includes(data.estado));
 }
 async function cargarMensajes(){
@@ -643,29 +726,45 @@ async function cargarMensajes(){
   });
   box.scrollTop = box.scrollHeight;
 }
-async function enviarMsg(){
-  const t = $('ch-input').value.trim(); if (!t || !chatId) return;
-  $('ch-input').value = '';
+async function enviarMsg(rapido){
+  const t = (typeof rapido === 'string' ? rapido : $('ch-input').value).trim(); if (!t || !chatId) return;
+  if (typeof rapido !== 'string') $('ch-input').value = '';
   const { error } = await _sb.from('ne_mensajes').insert({ pedido_id: chatId, autor_id: sesion.user.id, tipo:'texto', texto: t.slice(0,1000) });
   if (error) mostrarToast('No se envió: ' + error.message); else cargarMensajes();
 }
 $('ch-input').addEventListener('keydown', e => { if (e.key === 'Enter') enviarMsg(); });
 
 /* ============ MIS PEDIDOS ============ */
+async function repetirPedido(p){
+  cerrarModal('modal-pedidos'); await irCliente();
+  pagoMetodo = p.pago_envio_metodo === 'transferencia' ? 'transferencia' : 'efectivo';
+  pagoMomento = p.pago_envio_momento === 'retiro' ? 'retiro' : 'entrega';
+  pagoAdelanto = Number(p.adelanto_monto) > 0; adelConsultado = 0;
+  $('adel-box').classList.toggle('hidden', !pagoAdelanto); if (pagoAdelanto) $('adel-monto').value = Math.round(Number(p.adelanto_monto));
+  chipsRepintar.forEach(f => f()); limpiarLista();
+  comercioParam = p.comercio || '';
+  ponerPunto('r', p.retiro_lat, p.retiro_lng, p.retiro_dir, false, true);
+  ponerPunto('e', p.entrega_lat, p.entrega_lng, p.entrega_dir, false, true);
+  setActivo('r');
+  try { mapa.fitBounds([[p.retiro_lat, p.retiro_lng], [p.entrega_lat, p.entrega_lng]], { padding: [40, 40], maxZoom: 16 }); } catch (e) {}
+  mostrarToast('Listo, cargamos tu pedido anterior 💚 Ahora elegí repartidor.');
+}
 async function abrirMisPedidos(){
   abrirModal('modal-pedidos'); const box = $('lista-pedidos'); box.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
   try { await asegurarSesion(); } catch(e){ return; }
-  const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,retiro_dir,entrega_dir,creado').eq('cliente_id', sesion.user.id).order('creado', { ascending:false }).limit(30);
+  const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,retiro_dir,entrega_dir,creado,retiro_lat,retiro_lng,entrega_lat,entrega_lng,pago_envio_metodo,pago_envio_momento,adelanto_monto,comercio').eq('cliente_id', sesion.user.id).order('creado', { ascending:false }).limit(30);
   if (error) { box.textContent = 'Error al cargar'; return; }
-  if (!data.length) { box.innerHTML = '<p class="text-xs text-slate-400">Todavía no hiciste pedidos.</p>'; return; }
+  if (!data.length) { box.innerHTML = '<p class="text-sm text-slate-500 text-center py-4">Todavía no hiciste pedidos. ¡Pedí el primero! 🏍️</p>'; return; }
   box.innerHTML = '';
   data.forEach(p => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'clean-card w-full rounded-2xl p-3 text-left';
-    b.innerHTML = `<div class="flex justify-between text-xs"><b class="text-brand-700">${esc(ESTADOS[p.estado]||p.estado)}</b><b>${money(p.precio)}</b></div>
+    b.innerHTML = `<div class="flex justify-between text-xs"><b class="text-brand-700">${esc(ESTADOS_CLI[p.estado]||p.estado)}</b><b>${money(p.precio)}</b></div>
       <p class="text-[11px] text-slate-500 truncate">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</p>
       <p class="text-[10px] text-slate-400">${new Date(p.creado).toLocaleString('es-AR')}</p>`;
     b.onclick = () => { cerrarModal('modal-pedidos'); abrirChat(p.id); };
-    box.appendChild(b);
+    const w = document.createElement('div'); w.appendChild(b);
+    if (!ABIERTOS.includes(p.estado)) { const r = document.createElement('button'); r.type = 'button'; r.className = 'mt-1 w-full text-xs font-black text-brand-700 bg-brand-50 border border-brand-200 rounded-xl py-2 active:scale-95'; r.textContent = '🔁 Repetir este pedido'; r.onclick = () => repetirPedido(p); w.appendChild(r); }
+    box.appendChild(w);
   });
 }
 
@@ -719,7 +818,7 @@ function irPorUrl(u){
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.url) irPorUrl(e.data.url); });
 (async () => {
-  ico();
+  ico(); saludar();
   try { await asegurarSesion(); } catch(e){}
   const sp = new URLSearchParams(location.search);
   if (sp.has('chat') || sp.has('rep')) { irPorUrl('/' + location.search); history.replaceState(null, '', location.pathname); }

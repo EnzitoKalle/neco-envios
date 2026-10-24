@@ -229,7 +229,7 @@
     const sol = L.filter(x => x.estado === 'solicitado');
     if (!sol.length) cerrarSolicitud(); else if (!solActual || !sol.some(x => x.id === solActual.id)) mostrarSolicitud(sol[0]);
     const box = $('r-lista'); if (!box) return; box.innerHTML = '';
-    if (!L.length) { box.innerHTML = '<p class="text-center text-xs text-slate-400 py-6">No tenés pedidos en este momento.</p>'; return; }
+    if (!L.length) { box.innerHTML = '<p class="text-center text-sm text-slate-500 py-8">Todo tranquilo por ahora 😊 Cuando llegue un pedido te avisamos.</p>'; return; }
     L.forEach(o => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-3xl space-y-2 ' + (o.estado === 'solicitado' ? 'p-5 border-4 border-amber-400' : 'p-4');
       d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="${o.estado === 'solicitado' ? 'text-3xl' : 'text-lg'} text-brand-600">${money(o.precio)}</b></div>
