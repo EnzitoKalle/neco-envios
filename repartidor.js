@@ -438,7 +438,21 @@
     const on = !!R.perfil.comparte_ubicacion;
     c.innerHTML = card(`<p class="font-black">📍 Seguimiento en vivo <span class="text-[10px] font-black text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 ml-1">OPCIONAL</span></p>
       <p class="text-[11px] text-slate-500">Si lo activás, el cliente de tu pedido puede ver en un mapa por dónde vas, y tu perfil muestra la insignia <b>«📍 Seguimiento en vivo»</b>, que genera más confianza. Se comparte <b>solo mientras llevás un pedido</b> y solo con ese cliente. Se guarda únicamente tu última posición y se borra al terminar. Funciona mientras tengas esta app abierta en la pantalla.</p>
-      <label class="flex items-center gap-2 text-sm font-bold"><input id="ubi-chk" type="checkbox" class="w-5 h-5" ${on ? 'checked' : ''}> Compartir mi ubicación en vivo</label>`);
+      <label class="flex items-center gap-2 text-sm font-bold"><input id="ubi-chk" type="checkbox" class="w-5 h-5" ${on ? 'checked' : ''}> Compartir mi ubicación en vivo</label>
+      <button id="ubi-test" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-xs rounded-xl py-2.5 active:scale-95">🔎 Probar mi ubicación</button>
+      <p id="ubi-res" class="text-[11px] text-slate-600 font-bold"></p>`);
+    $('ubi-test').onclick = () => {
+      const out = $('ubi-res'); out.textContent = 'Buscando tu ubicación…';
+      if (!navigator.geolocation) { out.textContent = '⚠ Este dispositivo no permite compartir la ubicación.'; return; }
+      navigator.geolocation.getCurrentPosition(pos => {
+        const la = pos.coords.latitude, lo = pos.coords.longitude, pr = Math.round(pos.coords.accuracy || 0);
+        const dentro = la >= -39.3 && la <= -37.8 && lo >= -59.5 && lo <= -58.0;
+        let t = '📍 Tu dispositivo se ubica en ' + la.toFixed(4) + ', ' + lo.toFixed(4) + ' (precisión de unos ' + pr + ' m). ';
+        t += dentro ? '✓ Está dentro de la zona de Necochea y Quequén.' : '⚠ Está FUERA de la zona (suele pasar con computadoras: usan una ubicación aproximada por internet). El sistema la rechaza. Probalo desde un celular con GPS.';
+        if (pr > 500) t += ' La precisión es baja: parece una computadora sin GPS.';
+        out.textContent = t;
+      }, err => { out.textContent = '⚠ No se pudo obtener tu ubicación: ' + ({ 1: 'el permiso está denegado (activalo en los ajustes del navegador)', 2: 'la ubicación no está disponible', 3: 'tardó demasiado' }[err.code] || 'error desconocido') + '.'; }, { enableHighAccuracy: true, timeout: 20000 });
+    };
     $('ubi-chk').onchange = e => {
       const quiere = e.target.checked;
       const guardar = async v => {
