@@ -172,6 +172,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
     </div>
     <div id="ch-rep" class="hidden flex items-center gap-3 bg-brand-50 rounded-2xl p-2.5"></div>
     <div id="ch-pasos" class="hidden"></div>
+    <div id="ch-mapa-box" class="hidden space-y-1"><div id="ch-mapa" style="height:170px;border-radius:1rem;z-index:0"></div><p id="ch-mapa-txt" class="text-[11px] font-bold text-brand-700"></p></div>
     <div id="ch-info" class="text-[11px] text-slate-500 space-y-0.5"></div>
     <div id="ch-msgs" class="custom-scrollbar flex-1 min-h-[180px] max-h-[40vh] overflow-y-auto bg-slate-50 rounded-2xl p-3 space-y-2"></div>
     <div id="ch-acciones" class="space-y-2"></div>
@@ -564,7 +565,7 @@ function pintarRepartidores(lista){
     const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
     const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
     d.innerHTML = `<img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
-      <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>
+      <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>${r.comparte_ubicacion ? '<p class="text-[10px] font-black text-brand-700">📍 Seguimiento en vivo</p>' : ''}
       <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo]||r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p><p class="text-[10px] text-slate-500">${pagoMetodo === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo'} · ${pagoMomento === 'retiro' ? 'en el retiro' : 'en la entrega'}${adelConsultado > 0 ? ' · adelanta ' + money(adelConsultado) : ''}</p></div>
       <div class="text-right"><p class="font-black text-lg text-brand-600">${money(r.precio)}</p>
       <button type="button" class="mt-1 bg-brand-600 text-white text-xs font-black px-3 py-1.5 rounded-xl active:scale-95">Solicitar</button></div>`;
@@ -636,7 +637,7 @@ async function solicitar(r, btn){
 }
 
 /* ============ CHAT DEL PEDIDO ============ */
-let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0, chatRep = null;
+let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0, chatRep = null, mapaChat = null, capaChat = null;
 const PASOS = [['aceptado','Aceptado'],['en_camino_retiro','En camino'],['retirado','Retirado'],['entregado','Entregado']];
 const RAP_CLI = ['Gracias 🙌','Ya te estoy esperando','Tocá el timbre, por favor','¿Cuánto falta?'];
 const RAP_REP = ['Ya llegué 🙌','Estoy en la puerta','¿Me abrís, por favor?','Gracias'];
@@ -654,7 +655,29 @@ function pintarRep(){
   if (!chatRep) { e.classList.add('hidden'); return; }
   e.classList.remove('hidden');
   const foto = chatRep.rostro_path ? SUPABASE_URL + '/storage/v1/object/public/ne-rostros/' + encodeURI(chatRep.rostro_path) : '';
-  e.innerHTML = '<img src="' + esc(foto) + '" alt="" class="w-11 h-11 rounded-xl object-cover bg-slate-100 border border-brand-200"><div class="text-xs"><p class="font-black text-slate-900">Tu repartidor: ' + esc(chatRep.nombre) + '</p><p class="text-slate-500">' + esc(VEH[chatRep.vehiculo] || chatRep.vehiculo || '') + (Number(chatRep.cant) ? ' · ⭐ ' + Number(chatRep.calificacion).toFixed(1) : ' · Nuevo') + '</p></div>';
+  e.innerHTML = '<img src="' + esc(foto) + '" alt="" class="w-11 h-11 rounded-xl object-cover bg-slate-100 border border-brand-200"><div class="text-xs"><p class="font-black text-slate-900">Tu repartidor: ' + esc(chatRep.nombre) + '</p><p class="text-slate-500">' + esc(VEH[chatRep.vehiculo] || chatRep.vehiculo || '') + (Number(chatRep.cant) ? ' · ⭐ ' + Number(chatRep.calificacion).toFixed(1) : ' · Nuevo') + (chatRep.comparte ? ' · 📍 en vivo' : '') + '</p></div>';
+}
+// Dónde está mi repartidor (solo si él activó el seguimiento en vivo y el pedido está en curso)
+async function actualizarUbicacion(data){
+  const box = $('ch-mapa-box');
+  const activo = ['aceptado','en_camino_retiro','retirado'].includes(data.estado);
+  if (!(chatRep && chatRep.comparte && activo)) { box.classList.add('hidden'); return; }
+  let u = null; try { const r = await _sb.rpc('ne_ubicacion_repartidor', { p_pedido: data.id }); u = r.data; } catch (e) {}
+  if (!u || u.lat == null || chatId !== data.id) { box.classList.add('hidden'); return; }
+  const seg = Math.max(0, Math.round((Date.now() - new Date(u.actualizado).getTime()) / 1000));
+  const haciaEntrega = data.estado === 'retirado';
+  const dest = haciaEntrega ? [Number(data.entrega_lat), Number(data.entrega_lng)] : [Number(data.retiro_lat), Number(data.retiro_lng)];
+  box.classList.remove('hidden');
+  if (!mapaChat) { mapaChat = L.map('ch-mapa', { zoomControl: false }); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaChat); capaChat = L.layerGroup().addTo(mapaChat); }
+  capaChat.clearLayers();
+  L.marker([u.lat, u.lng], { icon: mkIcon('#0b6e5a', '🏍️') }).addTo(capaChat);
+  L.marker(dest, { icon: mkIcon('#f59e0b', haciaEntrega ? 'E' : 'R') }).addTo(capaChat);
+  setTimeout(() => { try { mapaChat.invalidateSize(); mapaChat.fitBounds([[u.lat, u.lng], dest], { padding: [30, 30], maxZoom: 17 }); } catch (e) {} }, 60);
+  const m = Math.round(dist({ lat: u.lat, lng: u.lng }, { lat: dest[0], lng: dest[1] }));
+  const cerca = m < 1000 ? m + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km';
+  $('ch-mapa-txt').textContent = seg > 180
+    ? '⏳ Última ubicación hace ' + Math.round(seg / 60) + ' min (puede tener la app en segundo plano)'
+    : '🏍️ Tu repartidor está a unos ' + cerca + ' ' + (haciaEntrega ? 'del destino' : 'del lugar de retiro') + ' · hace ' + (seg < 60 ? seg + ' s' : Math.round(seg / 60) + ' min');
 }
 function celebrar(){
   const box = document.createElement('div'); box.className = 'fixed inset-0 pointer-events-none z-[80] overflow-hidden';
@@ -663,7 +686,7 @@ function celebrar(){
   document.body.appendChild(box); setTimeout(() => { try { box.remove(); } catch (e) {} }, 3600);
 }
 async function abrirChat(id){
-  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-rep').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
+  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-rep').classList.add('hidden'); $('ch-mapa-box').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
   await refrescarPedido(); await cargarMensajes();
   if (chatCanal) _sb.removeChannel(chatCanal);
   chatCanal = _sb.channel('ped-' + id)
@@ -685,7 +708,7 @@ async function refrescarPedido(){
   const idxPaso = PASOS.findIndex(x => x[0] === data.estado);
   $('ch-pasos').classList.toggle('hidden', idxPaso < 0);
   if (idxPaso >= 0) $('ch-pasos').innerHTML = pasosHTML(idxPaso);
-  if (esCli && chatRep === null) { chatRep = false; _sb.rpc('ne_info_repartidor', { p_pedido: data.id }).then(r => { chatRep = r.data || false; pintarRep(); }); } else pintarRep();
+  if (esCli && chatRep === null) { chatRep = false; _sb.rpc('ne_info_repartidor', { p_pedido: data.id }).then(r => { chatRep = r.data || false; pintarRep(); actualizarUbicacion(data); }); } else { pintarRep(); if (esCli) actualizarUbicacion(data); }
   const rap = $('ch-rapidas'); rap.innerHTML = '';
   if (ABIERTOS.includes(data.estado)) (esCli ? RAP_CLI : RAP_REP).forEach(t => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-shrink-0 text-xs font-bold bg-white border border-slate-200 rounded-full px-3 py-1.5 active:scale-95'; b.textContent = t; b.onclick = () => enviarMsg(t); rap.appendChild(b); });
   if (esCli && antes && antes !== 'entregado' && data.estado === 'entregado') celebrar();
@@ -707,6 +730,7 @@ async function refrescarPedido(){
     ac.appendChild(w);
   }
   if (data.calificacion) ac.innerHTML = `<p class="text-center text-xs text-slate-500">Calificación: ${['😞','😕','😐','🙂','😍'][data.calificacion - 1] || '⭐'}</p>`;
+  if (!esCli && typeof navFila === 'function' && ['aceptado','en_camino_retiro','retirado'].includes(data.estado)) ac.insertAdjacentHTML('afterbegin', navFila(data));
   $('ch-form').classList.toggle('hidden', !ABIERTOS.includes(data.estado));
 }
 async function cargarMensajes(){
@@ -799,7 +823,7 @@ const LEGAL = {
     'Clientes: guardamos tu nombre, tu WhatsApp, las direcciones de tus pedidos y los mensajes del chat. Tu teléfono no se muestra al repartidor.',
     'Repartidores: guardamos nombre completo, número de documento, foto del DNI y foto de rostro para verificar identidad. La foto del DNI se guarda en un espacio privado y solo la ve el administrador. La foto de rostro se muestra a los clientes.',
     'Usamos Supabase (base de datos y archivos) y servicios de mapas de OpenStreetMap. No vendemos tus datos.',
-    'Los repartidores pueden eliminar su perfil desde la app: se borran su DNI, sus fotos y sus datos personales, y se conserva el registro de pedidos y comisiones sin datos personales. Podés pedir acceso, rectificación o eliminación de tus datos escribiendo al administrador. La Agencia de Acceso a la Información Pública es el órgano de control de la Ley 25.326.']]
+    'Los repartidores pueden eliminar su perfil desde la app: se borran su DNI, sus fotos y sus datos personales, y se conserva el registro de pedidos y comisiones sin datos personales. Si un repartidor activa el seguimiento en vivo (es opcional), su ubicación se muestra únicamente al cliente de ese pedido mientras lo lleva, se guarda solo la última posición y se borra al terminar. Podés pedir acceso, rectificación o eliminación de tus datos escribiendo al administrador. La Agencia de Acceso a la Información Pública es el órgano de control de la Ley 25.326.']]
 };
 function mostrarLegal(t){
   $('legal-titulo').textContent = LEGAL[t][0]; const box = $('legal-texto'); box.innerHTML = '';
