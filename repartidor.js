@@ -12,7 +12,7 @@
   async function salir() { if (!confirm('¿Cerrar sesión de Google?')) return; localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); }
   root().addEventListener('click', e => { if (e.target.closest('[data-salir]')) salir(); });
 
-  function detener() { clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
+  function detener() { detenerUbicacion(false); clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
   function cerrarCamara() { if (R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; } }
 
   window.irRepartidor = async function () { vista('repartidor'); await pantalla(); };
@@ -171,6 +171,7 @@
       <div id="r-cont"></div>`;
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
+    $('r-badge').textContent = p.comparte_ubicacion ? '📍 Seguimiento en vivo activado' : ''; $('r-badge').className = 'text-[11px] font-bold text-brand-600';
     if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabAjustes(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
   }
 
@@ -226,6 +227,7 @@
     const { data } = await _sb.from('ne_pedidos').select('*').eq('repartidor_id', sesion.user.id)
       .in('estado', ['solicitado', 'aceptado', 'en_camino_retiro', 'retirado']).order('creado');
     const L = data || []; R.activos = L.filter(x => x.estado !== 'solicitado').length; pintarEstado();
+    if (R.perfil.comparte_ubicacion && R.activos > 0) iniciarUbicacion(); else if (geoId !== null) detenerUbicacion(true);
     const sol = L.filter(x => x.estado === 'solicitado');
     if (!sol.length) cerrarSolicitud(); else if (!solActual || !sol.some(x => x.id === solActual.id)) mostrarSolicitud(sol[0]);
     const box = $('r-lista'); if (!box) return; box.innerHTML = '';
@@ -233,20 +235,109 @@
     L.forEach(o => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-3xl space-y-2 ' + (o.estado === 'solicitado' ? 'p-5 border-4 border-amber-400' : 'p-4');
       d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="${o.estado === 'solicitado' ? 'text-3xl' : 'text-lg'} text-brand-600">${money(o.precio)}</b></div>
-        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}
+        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}${navFila(o)}
         ${o.comercio ? `<p class="text-[11px] text-slate-400">Comercio: ${esc(o.comercio)}</p>` : ''}<p class="text-[11px] text-slate-400">Cliente: ${esc(o.cliente_nombre)}</p>
-        <div class="flex gap-2 pt-1" data-acc></div>`;
+        <div class="flex flex-wrap gap-2 pt-1" data-acc></div>`;
       const acc = d.querySelector('[data-acc]');
-      const mk = (t, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-1 font-black rounded-xl active:scale-95 ' + (o.estado === 'solicitado' ? 'text-base py-4 ' : 'text-xs py-2.5 ') + cls; b.textContent = t; b.onclick = async () => { b.disabled = true; await fn(); b.disabled = false; }; acc.appendChild(b); };
+      const mk = (t, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'flex-1 min-w-[40%] font-black rounded-xl active:scale-95 ' + (o.estado === 'solicitado' ? 'text-base py-4 ' : 'text-xs py-2.5 ') + cls; b.textContent = t; b.onclick = async () => { b.disabled = true; await fn(); b.disabled = false; }; acc.appendChild(b); };
       if (o.estado === 'solicitado') {
         mk('Aceptar', 'bg-brand-600 text-white', async () => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: true }); if (error) mostrarToast(error.message); refrescarPedidos(); });
         mk('Rechazar', 'bg-slate-100 text-slate-700', async () => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: false }); if (error) mostrarToast(error.message); refrescarPedidos(); });
       } else {
         mk(SIG[o.estado], 'bg-gradient-to-r from-brand-700 to-brand-500 text-white', async () => { const { error } = await _sb.rpc('ne_avanzar', { p_pedido: o.id }); if (error) mostrarToast(error.message); else mostrarToast('Listo'); refrescarPedidos(); });
         mk('💬 Chat', 'bg-slate-100 text-slate-700', async () => abrirChat(o.id));
+        mk('🗺️ Mapa y cómo llegar', 'bg-brand-50 text-brand-700 border border-brand-200', async () => abrirMapaPedido(o));
       }
       box.appendChild(d);
     });
+  }
+
+  /* --- Mapa del recorrido y botón «¿Cómo llegar?» (abre el GPS del celular) --- */
+  const peds = {};
+  function urlNav(lat, lng, app) {
+    const la = Number(lat), lo = Number(lng); if (!isFinite(la) || !isFinite(lo)) return '#';
+    if (app === 'waze') return 'https://waze.com/ul?ll=' + la + ',' + lo + '&navigate=yes';
+    const modo = { moto: 'two-wheeler', bici: 'bicycling', auto: 'driving' }[R.perfil && R.perfil.vehiculo] || 'driving';
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=' + modo;
+  }
+  function destinoDe(o) { return o.estado === 'retirado' ? { lat: o.entrega_lat, lng: o.entrega_lng, txt: 'a la entrega' } : { lat: o.retiro_lat, lng: o.retiro_lng, txt: 'al retiro' }; }
+  function navLinks(o) {
+    const d = destinoDe(o), cls = 'flex-1 text-center text-xs font-black rounded-xl py-2.5 active:scale-95 ';
+    return '<a href="' + esc(urlNav(d.lat, d.lng, 'google')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>' +
+           '<a href="' + esc(urlNav(d.lat, d.lng, 'waze')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-sky-50 border border-sky-200 text-sky-700">Waze</a>';
+  }
+  function navFila(o) {
+    peds[o.id] = o;
+    const mapaBtn = '<button type="button" onclick="verMapaRep(\'' + esc(o.id) + '\')" class="flex-1 text-xs font-black bg-amber-50 border border-amber-200 text-amber-800 rounded-xl py-2.5 active:scale-95">🗺️ Ver mapa</button>';
+    return '<div class="flex gap-2 pt-1">' + (o.estado === 'solicitado' ? '' : navLinks(o)) + mapaBtn + '</div>';
+  }
+  window.navFila = navFila;
+  const kmEntre = o => (dist({ lat: Number(o.retiro_lat), lng: Number(o.retiro_lng) }, { lat: Number(o.entrega_lat), lng: Number(o.entrega_lng) }) / 1000).toFixed(1).replace('.', ',');
+  let mapaRep = null;
+  function modalMapa() {
+    let m = $('modal-mapa');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'modal-mapa';
+      m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[75]';
+      m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3"><div class="flex justify-between items-start"><div><p class="font-black text-slate-900">Recorrido del pedido</p><p id="mapa-titulo" class="text-[11px] text-slate-500"></p></div>' +
+        '<button id="mapa-cerrar" type="button" class="p-1 text-slate-400 text-2xl leading-none">×</button></div><div id="mapa-rep" style="height:52vh;border-radius:1rem;z-index:0"></div>' +
+        '<p class="text-[11px] text-slate-500"><b class="text-brand-700">R</b> = retiro · <b class="text-amber-600">E</b> = entrega (la línea es solo una guía, no la ruta)</p><div id="mapa-nav" class="flex gap-2"></div></div>';
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  window.verMapaRep = id => {
+    const o = peds[id]; if (!o) return;
+    const m = modalMapa(); m.classList.remove('hidden'); m.classList.add('flex');
+    $('mapa-cerrar').onclick = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
+    $('mapa-titulo').textContent = 'A unos ' + kmEntre(o) + ' km en línea recta entre el retiro y la entrega';
+    $('mapa-nav').innerHTML = o.estado === 'solicitado' ? '' : navLinks(o);
+    if (mapaRep) { try { mapaRep.remove(); } catch (e) {} mapaRep = null; }
+    mapaRep = L.map('mapa-rep');
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaRep);
+    const a = [Number(o.retiro_lat), Number(o.retiro_lng)], b = [Number(o.entrega_lat), Number(o.entrega_lng)];
+    L.marker(a, { icon: mkIcon('#0b6e5a', 'R') }).addTo(mapaRep).bindTooltip('Retiro');
+    L.marker(b, { icon: mkIcon('#f59e0b', 'E') }).addTo(mapaRep).bindTooltip('Entrega');
+    L.polyline([a, b], { color: '#0b6e5a', weight: 3, dashArray: '6 8' }).addTo(mapaRep);
+    mapaRep.fitBounds([a, b], { padding: [40, 40], maxZoom: 16 });
+    setTimeout(() => { try { mapaRep.invalidateSize(); } catch (e) {} }, 80);
+  };
+
+  /* --- Mapa del pedido y «Cómo llegar» --- */
+  function enlacesNav(lat, lng) {
+    const la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6);
+    const a = (href, txt) => '<a href="' + href + '" target="_blank" rel="noopener" class="flex-1 text-center text-xs font-black bg-slate-900 text-white rounded-xl py-2.5 active:scale-95">' + txt + '</a>';
+    return a('https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=driving', '🧭 Google Maps') +
+           a('https://waze.com/ul?ll=' + la + ',' + lo + '&navigate=yes', '🧭 Waze') +
+           (esIOS ? a('https://maps.apple.com/?daddr=' + la + ',' + lo + '&dirflg=d', '🧭 Apple Maps') : '');
+  }
+  let mapaPed = null, capaPed = null;
+  function modalMapa() {
+    let m = $('modal-mapa-ped');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'modal-mapa-ped';
+      m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[80]';
+      m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"><div class="flex justify-between items-center"><p class="font-black text-slate-900">🗺️ Mapa del pedido</p><button id="mp-x" type="button" class="p-1 text-slate-400 text-xl">✕</button></div><div id="mp-mapa" style="height:280px;border-radius:1rem;z-index:0"></div><p id="mp-dist" class="text-[11px] text-slate-500"></p><div id="mp-nav" class="space-y-3"></div></div>';
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  function abrirMapaPedido(o) {
+    const m = modalMapa(); m.classList.remove('hidden'); m.classList.add('flex');
+    $('mp-x').onclick = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
+    const R0 = [Number(o.retiro_lat), Number(o.retiro_lng)], E0 = [Number(o.entrega_lat), Number(o.entrega_lng)];
+    const km = dist({ lat: R0[0], lng: R0[1] }, { lat: E0[0], lng: E0[1] }) / 1000;
+    $('mp-dist').textContent = '📏 Entre el retiro y la entrega hay unos ' + km.toFixed(1).replace('.', ',') + ' km en línea recta.';
+    const bloque = (titulo, dir, pos) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-[11px] text-slate-500 mb-1">' + esc(fixDir(dir)) + '</p><div class="flex gap-2">' + enlacesNav(pos[0], pos[1]) + '</div></div>';
+    const bR = bloque('📍 Cómo llegar al retiro', o.retiro_dir, R0), bE = bloque('🏁 Cómo llegar a la entrega', o.entrega_dir, E0);
+    $('mp-nav').innerHTML = o.estado === 'retirado' ? bE + bR : bR + bE;      // lo que toca primero, arriba
+    setTimeout(() => {
+      if (!mapaPed) { mapaPed = L.map('mp-mapa'); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaPed); capaPed = L.layerGroup().addTo(mapaPed); }
+      capaPed.clearLayers();
+      L.marker(R0, { icon: mkIcon('#0b6e5a', 'R') }).addTo(capaPed); L.marker(E0, { icon: mkIcon('#f59e0b', 'E') }).addTo(capaPed);
+      L.polyline([R0, E0], { color: '#0b6e5a', weight: 3, dashArray: '6 8' }).addTo(capaPed);
+      mapaPed.invalidateSize(); mapaPed.fitBounds([R0, E0], { padding: [40, 40], maxZoom: 17 });
+    }, 60);
   }
 
   /* --- Pedido nuevo: ventana grande y llamativa --- */
@@ -270,7 +361,7 @@
   }
   function cerrarSolicitud() { clearInterval(solTimer); solActual = null; const m = $('modal-sol'); if (m) { m.classList.add('hidden'); m.classList.remove('flex'); } }
   function mostrarSolicitud(o) {
-    cerrarSolicitud(); solActual = o;
+    cerrarSolicitud(); solActual = o; peds[o.id] = o;
     if (!vistas.has(o.id)) { vistas.add(o.id); try { navigator.vibrate && navigator.vibrate([400, 150, 400, 150, 400]); } catch (e) {} pitar(); }
     const m = modalSol(), c = $('sol-card');
     c.innerHTML = `<p class="text-center text-2xl font-black text-amber-600">🔔 ¡NUEVO PEDIDO!</p>
@@ -279,6 +370,8 @@
       <div class="space-y-1.5"><p class="text-base text-slate-800">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-base text-slate-800">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>
       ${o.comercio ? `<p class="text-sm text-slate-500">Comercio: ${esc(o.comercio)}</p>` : ''}</div>
       <div class="bg-amber-50 rounded-2xl p-3 space-y-1">${resumenPago(o, false)}</div>
+      <button id="sol-mapa" type="button" class="w-full bg-amber-50 border border-amber-200 text-amber-800 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver recorrido (~${kmEntre(o)} km en línea recta)</button>
+      <button id="sol-mapa" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver en el mapa y cómo llegar</button>
       <button id="sol-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-xl rounded-2xl py-5 shadow-lg active:scale-[.98]">ACEPTAR</button>
       <button id="sol-no" type="button" class="w-full bg-slate-100 text-slate-700 font-black text-base rounded-2xl py-3 active:scale-95">Rechazar</button>`;
     m.classList.remove('hidden'); m.classList.add('flex');
@@ -286,7 +379,8 @@
     const tick = () => { const s = Math.max(0, Math.round((fin - Date.now()) / 1000)); const e = $('sol-cuenta'); if (e) e.textContent = 'Respondé en ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s <= 0) { cerrarSolicitud(); refrescarPedidos(); } };
     tick(); solTimer = setInterval(tick, 1000);
     const responder = async acepta => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: acepta }); if (error) mostrarToast(error.message); cerrarSolicitud(); refrescarPedidos(); };
-    $('sol-ok').onclick = () => responder(true); $('sol-no').onclick = () => responder(false);
+    $('sol-mapa').onclick = () => window.verMapaRep(o.id);
+    $('sol-ok').onclick = () => responder(true); $('sol-no').onclick = () => responder(false); $('sol-mapa').onclick = () => abrirMapaPedido(o);
   }
 
   /* --- Cobros (configuración del repartidor) --- */
@@ -318,6 +412,37 @@
       Object.assign(R.perfil, cambios); mostrarToast('Cobros guardados');
     };
   }
+  /* --- Seguimiento en vivo (opcional) --- */
+  let geoId = null;
+  function detenerUbicacion(avisar) {
+    if (geoId !== null && navigator.geolocation) { try { navigator.geolocation.clearWatch(geoId); } catch (e) {} }
+    geoId = null; if (avisar) _sb.rpc('ne_detener_ubicacion');
+  }
+  function iniciarUbicacion() {
+    if (geoId !== null || !navigator.geolocation) return;
+    geoId = navigator.geolocation.watchPosition(pos => {
+      _sb.rpc('ne_publicar_ubicacion', { p_lat: pos.coords.latitude, p_lng: pos.coords.longitude, p_precision: Math.round(pos.coords.accuracy || 0) });
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  }
+  function ubicacionCard(c) {
+    const on = !!R.perfil.comparte_ubicacion;
+    c.innerHTML = card(`<p class="font-black">📍 Seguimiento en vivo <span class="text-[10px] font-black text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 ml-1">OPCIONAL</span></p>
+      <p class="text-[11px] text-slate-500">Si lo activás, el cliente de tu pedido puede ver en un mapa por dónde vas, y tu perfil muestra la insignia <b>«📍 Seguimiento en vivo»</b>, que genera más confianza. Se comparte <b>solo mientras llevás un pedido</b> y solo con ese cliente. Se guarda únicamente tu última posición y se borra al terminar. Funciona mientras tengas esta app abierta en la pantalla.</p>
+      <label class="flex items-center gap-2 text-sm font-bold"><input id="ubi-chk" type="checkbox" class="w-5 h-5" ${on ? 'checked' : ''}> Compartir mi ubicación en vivo</label>`);
+    $('ubi-chk').onchange = e => {
+      const quiere = e.target.checked;
+      const guardar = async v => {
+        const { error } = await _sb.from('ne_repartidores').update({ comparte_ubicacion: v }).eq('user_id', sesion.user.id);
+        if (error) { $('ubi-chk').checked = !v; return mostrarToast('Error: ' + error.message); }
+        R.perfil.comparte_ubicacion = v;
+        if (!v) detenerUbicacion(true);
+        mostrarToast(v ? 'Seguimiento en vivo activado 📍' : 'Seguimiento en vivo desactivado');
+      };
+      if (!quiere) return guardar(false);
+      if (!navigator.geolocation) { $('ubi-chk').checked = false; return mostrarToast('Este celular no permite compartir la ubicación'); }
+      navigator.geolocation.getCurrentPosition(() => guardar(true), () => { $('ubi-chk').checked = false; mostrarToast('Necesitamos tu permiso de ubicación. Activalo en los ajustes del navegador y probá de nuevo.'); }, { timeout: 15000 });
+    };
+  }
   function eliminarCard(c) {
     c.innerHTML = card(`<p class="font-black text-rose-600">Eliminar mi perfil de repartidor</p>
       <p class="text-[11px] text-slate-500">Se borran tu DNI, tu foto, tus zonas y tus precios. Tus pedidos pasados quedan registrados sin tus datos personales. Tu cuenta de Google no se elimina. Si más adelante querés volver, te registrás de nuevo y esperás la aprobación.</p>
@@ -332,8 +457,8 @@
     };
   }
   async function tabAjustes() {
-    $('r-cont').innerHTML = '<div id="aj-cob"></div><div id="aj-hor" class="mt-3"></div><div id="aj-del" class="mt-3"></div>';
-    cobrosCard($('aj-cob')); eliminarCard($('aj-del')); await tabHorarios();
+    $('r-cont').innerHTML = '<div id="aj-cob"></div><div id="aj-ubi" class="mt-3"></div><div id="aj-hor" class="mt-3"></div><div id="aj-del" class="mt-3"></div>';
+    cobrosCard($('aj-cob')); ubicacionCard($('aj-ubi')); eliminarCard($('aj-del')); await tabHorarios();
   }
 
   /* --- Horarios --- */
