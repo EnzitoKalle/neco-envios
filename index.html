@@ -146,20 +146,14 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
       <div class="clean-card rounded-3xl p-5 space-y-3">
         <div><p class="font-black text-slate-900 text-sm">Filtrá según lo que necesites</p>
           <p class="text-[11px] text-slate-500">Le pagás directo al repartidor que elijas. Estos filtros muestran solo a los que se ajustan a vos.</p></div>
-        <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cómo querés pagar el envío?</p>
-          <div id="f-met" class="flex gap-1.5"><button type="button" data-v="todos">Cualquiera</button><button type="button" data-v="efectivo">💵 Efectivo</button><button type="button" data-v="transferencia">🏦 Transferencia</button></div></div>
-        <div class="space-y-1.5">
-          <button id="f-destino" type="button" class="w-full text-left text-xs font-black rounded-xl px-3 py-2.5"></button>
-          <button id="f-adel" type="button" class="w-full text-left text-xs font-black rounded-xl px-3 py-2.5"></button>
-          <div id="f-adel-box" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <label class="text-[11px] font-extrabold text-slate-600 uppercase">¿Cuánto cuesta tu compra? ($)</label>
-            <input id="f-adel-monto" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 15000">
-            <p class="text-[11px] text-slate-500 mt-1">El repartidor paga eso en el comercio y vos se lo devolvés cuando te llega el pedido. Te mostramos solo a los que manejan efectivo y llegan a ese monto.</p>
-          </div>
-        </div>
-        <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Qué vehículo necesitás?</p>
-          <div id="f-veh" class="flex gap-1.5"><button type="button" data-v="todos">Cualquiera</button><button type="button" data-v="moto">🏍️ Moto</button><button type="button" data-v="auto">🚗 Auto</button><button type="button" data-v="bici">🚲 Bici</button></div>
-          <p class="text-[11px] text-slate-400 mt-1">Para paquetes grandes o frágiles, elegí Auto.</p></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cómo querés pagar el envío?</label>
+          <select id="f-met" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="efectivo">💵 Efectivo</option><option value="transferencia">🏦 Transferencia</option></select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo pagás el envío?</label>
+          <select id="f-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="entrega">📦 Al recibir (en destino)</option><option value="retiro">Al retirar</option></select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿El repartidor paga tu compra en el comercio?</label>
+          <select id="f-adel" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="si">🛒 Sí, que la pague él y yo se la devuelvo</option></select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Qué vehículo necesitás?</label>
+          <select id="f-veh" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="moto">🏍️ Moto</option><option value="auto">🚗 Auto (paquetes grandes o frágiles)</option><option value="bici">🚲 Bici</option></select></div>
       </div>
       <p id="rep-cant" class="text-xs font-bold text-slate-500 px-1"></p>
       <div id="lista-rep" class="space-y-3"></div>
@@ -387,10 +381,12 @@ function resumenPago(p, esCli){
   const cuando = p.pago_envio_momento === 'retiro' ? 'en el retiro' : 'en la entrega';
   const adel = Number(p.adelanto_monto || 0);
   let h = '<p class="text-xs text-slate-700">💵 ' + (esCli ? 'Pagás el envío' : 'Cobrás el envío') + ' (<b>' + money(p.precio) + '</b>) por <b>' + met + '</b> <b>' + cuando + '</b>.</p>';
-  if (adel > 0) {
+  if (adel > 1) {
     h += '<p class="text-xs text-slate-700">🛒 ' + (esCli ? 'El repartidor paga <b>' + money(adel) + '</b> en el comercio y se lo devolvés al recibir el pedido.' : 'Pagás <b>' + money(adel) + '</b> en el comercio y se lo cobrás al cliente en la entrega.') + '</p>';
     const tot = adel + (p.pago_envio_momento === 'entrega' ? Number(p.precio) : 0);
     h += '<p class="text-xs font-black text-slate-900">Total ' + (esCli ? 'a pagar' : 'a cobrar') + ' en la entrega: ' + money(tot) + '</p>';
+  } else if (adel === 1) {
+    h += '<p class="text-xs text-slate-700">🛒 ' + (esCli ? 'El repartidor paga tu compra en el comercio y se la devolvés al recibir el pedido. El monto lo acuerdan por el chat.' : 'Pagás la compra en el comercio y se la cobrás al cliente en la entrega. El monto lo acuerdan por el chat.') + '</p>';
   }
   return h;
 }
@@ -536,25 +532,15 @@ function aplicarParams(){
 }
 
 /* ============ BUSCAR REPARTIDORES (todos los disponibles + filtros) ============ */
-const F = { metodo:'todos', destino:false, adel:false, veh:'todos' };
-let ultimaLista = [], adelMonto = 0, busqRep = 0, adelT = null;
+const F = { metodo:'todos', momento:'todos', adel:false, veh:'todos' };
+let ultimaLista = [], busqRep = 0;
 function limpiarLista(){ ultimaLista = []; const b = $('res-box'); if (b) b.classList.add('hidden'); const l = $('lista-rep'); if (l) l.innerHTML = ''; }
 const chipCls = on => 'text-xs font-black rounded-xl py-2 px-2 ' + (on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
-function pintarFiltros(){
-  document.querySelectorAll('#f-met [data-v]').forEach(b => { b.className = 'flex-1 ' + chipCls(b.dataset.v === F.metodo); });
-  document.querySelectorAll('#f-veh [data-v]').forEach(b => { b.className = 'flex-1 ' + chipCls(b.dataset.v === F.veh); });
-  const t = (id, on, txt) => { const e = $(id); e.className = 'w-full text-left text-xs font-black rounded-xl px-3 py-2.5 border ' + (on ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-slate-200'); e.textContent = (on ? '✓ ' : '') + txt; };
-  t('f-destino', F.destino, '📦 Quiero pagar el envío al recibir (en destino)');
-  t('f-adel', F.adel, '🛒 Mi compra se paga en el comercio: que el repartidor la adelante');
-  $('f-adel-box').classList.toggle('hidden', !F.adel);
-}
-document.querySelectorAll('#f-met [data-v]').forEach(b => b.addEventListener('click', () => { F.metodo = b.dataset.v; pintarFiltros(); pintarRepartidores(); }));
-document.querySelectorAll('#f-veh [data-v]').forEach(b => b.addEventListener('click', () => { F.veh = b.dataset.v; pintarFiltros(); pintarRepartidores(); }));
-$('f-destino').addEventListener('click', () => { F.destino = !F.destino; pintarFiltros(); pintarRepartidores(); });
-$('f-adel').addEventListener('click', () => { F.adel = !F.adel; pintarFiltros(); buscarRepartidores(); if (F.adel) setTimeout(() => $('f-adel-monto').focus(), 50); });
-$('f-adel-monto').addEventListener('input', () => { clearTimeout(adelT); adelT = setTimeout(buscarRepartidores, 700); });
+$('f-met').addEventListener('change', e => { F.metodo = e.target.value; pintarRepartidores(); });
+$('f-mom').addEventListener('change', e => { F.momento = e.target.value; pintarRepartidores(); });
+$('f-adel').addEventListener('change', e => { F.adel = e.target.value === 'si'; pintarRepartidores(); });
+$('f-veh').addEventListener('change', e => { F.veh = e.target.value; pintarRepartidores(); });
 $('tc-leer').addEventListener('click', () => mostrarLegal('terminos'));
-pintarFiltros();
 
 async function consultar(){
   if (!zonas.length) return mostrarToast('No pudimos cargar las zonas. Recargá la página.');
@@ -586,15 +572,10 @@ async function consultar(){
 async function buscarRepartidores(primera){
   if (!D.r || !D.e) return;
   const mi = ++busqRep;
-  if (F.adel) {
-    const m = Math.round(parseFloat($('f-adel-monto').value));
-    if (!(m > 0 && m <= 1000000)) { adelMonto = 0; ultimaLista = []; $('res-box').classList.remove('hidden'); pintarRepartidores('Poné cuánto cuesta tu compra para ver quién puede pagarla por vos.'); return; }
-    adelMonto = m;
-  } else adelMonto = 0;
   $('res-box').classList.remove('hidden'); $('rep-cant').textContent = ''; $('lista-rep').innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">Buscando repartidores…</div>';
   if (primera) $('res-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
   const base = { r_lat: D.r.lat, r_lng: D.r.lng, e_lat: D.e.lat, e_lng: D.e.lng };
-  const combos = [['efectivo', 'retiro', 0], ['efectivo', 'entrega', 0], ['transferencia', 'retiro', 0], ['transferencia', 'entrega', 0], ['efectivo', 'retiro', adelMonto || 1], ['efectivo', 'entrega', adelMonto || 1]];
+  const combos = [['efectivo', 'retiro', 0], ['efectivo', 'entrega', 0], ['transferencia', 'retiro', 0], ['transferencia', 'entrega', 0], ['efectivo', 'retiro', 1], ['efectivo', 'entrega', 1]];
   const res = await Promise.all(combos.map(([m, mo, ad]) => _sb.rpc('ne_listar_repartidores', { ...base, p_metodo: m, p_momento: mo, p_adelanto: ad }).then(r => r, e => ({ error: e }))));
   if (mi !== busqRep) return;
   if (res.every(r => r.error)) { $('lista-rep').innerHTML = ''; mostrarToast('Error: ' + (res[0].error.message || res[0].error)); return; }
@@ -611,7 +592,7 @@ const metodosDe = r => ['efectivo', 'transferencia'].filter(m => [...r.combos].s
 const momentosDe = r => ['entrega', 'retiro'].filter(mo => [...r.combos].some(c => c.endsWith('|' + mo)));
 function pasaFiltro(r){
   if (F.veh !== 'todos' && r.vehiculo !== F.veh) return false;
-  const ms = F.metodo === 'todos' ? ['efectivo', 'transferencia'] : [F.metodo], mo = F.destino ? ['entrega'] : ['retiro', 'entrega'];
+  const ms = F.metodo === 'todos' ? ['efectivo', 'transferencia'] : [F.metodo], mo = F.momento === 'todos' ? ['retiro', 'entrega'] : [F.momento];
   if (!ms.some(m => mo.some(x => r.combos.has(m + '|' + x)))) return false;
   if (F.adel && !r.adelanta) return false;
   return true;
@@ -630,7 +611,7 @@ function pintarRepartidores(msg){
     const pill = t => '<span class="inline-block text-[10px] font-black bg-brand-50 text-brand-700 border border-brand-200 rounded-full px-2 py-0.5">' + t + '</span>';
     const pills = [ms.includes('efectivo') ? pill('💵 Efectivo') : '', ms.includes('transferencia') ? pill('🏦 Transferencia') : '',
       pill(mos.length > 1 ? 'Cobra en retiro o entrega' : mos[0] === 'retiro' ? 'Cobra en el retiro' : 'Cobra al entregar'),
-      r.adelanta ? pill(F.adel ? '🛒 Te adelanta ' + money(adelMonto) : '🛒 Puede pagar tu compra') : ''].join(' ');
+      r.adelanta ? pill('🛒 Puede pagar tu compra') : ''].join(' ');
     const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 space-y-2';
     d.innerHTML = `<div class="flex items-center gap-3"><img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
       <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>${r.comparte_ubicacion ? '<p class="text-[10px] font-black text-brand-700">📍 Seguimiento en vivo</p>' : ''}
@@ -652,9 +633,9 @@ function abrirConf(r){
   conf = { r, ms, metodo, momento: null }; ajustarMomento(); pintarConf(); abrirModal('modal-conf');
 }
 const momentosConf = () => ['entrega', 'retiro'].filter(mo => conf.r.combos.has(conf.metodo + '|' + mo));
-function ajustarMomento(){ const mos = momentosConf(); conf.momento = (conf.momento && mos.includes(conf.momento)) ? conf.momento : ((F.destino && mos.includes('entrega')) ? 'entrega' : mos[0]); }
+function ajustarMomento(){ const mos = momentosConf(); conf.momento = (conf.momento && mos.includes(conf.momento)) ? conf.momento : ((F.momento !== 'todos' && mos.includes(F.momento)) ? F.momento : mos[0]); }
 function pintarConf(){
-  const r = conf.r, mos = momentosConf(), adel = (F.adel && r.adelanta) ? adelMonto : 0;
+  const r = conf.r, mos = momentosConf(), adel = (F.adel && r.adelanta) ? 1 : 0;
   const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
   const grupo = (titulo, ops, sel, attr) => '<div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">' + titulo + '</p><div class="flex gap-1.5">' +
     ops.map(([v, t]) => '<button type="button" ' + attr + '="' + v + '" class="flex-1 ' + chipCls(v === sel) + '">' + t + '</button>').join('') + '</div></div>';
@@ -674,7 +655,7 @@ $('conf-ok').addEventListener('click', async () => {
     const { data, error } = await _sb.rpc('ne_crear_pedido', {
       p_rep: r.repartidor_id, p_nombre: $('c-nombre').value.trim(), p_whatsapp: $('c-wsp').value.trim(), p_comercio: comercioParam,
       r_dir: dirFinal('r'), r_lat: D.r.lat, r_lng: D.r.lng, e_dir: dirFinal('e'), e_lat: D.e.lat, e_lng: D.e.lng,
-      p_metodo: conf.metodo, p_momento: conf.momento, p_adelanto: (F.adel && r.adelanta) ? adelMonto : 0 });
+      p_metodo: conf.metodo, p_momento: conf.momento, p_adelanto: (F.adel && r.adelanta) ? 1 : 0 });
     if (error) throw error; id = data;
   } catch (e) {
     let m = (e && e.message) || 'No se pudo solicitar el envío';
