@@ -1,5 +1,5 @@
 /* NECO ENVÍOS - Service worker. Sube el número de VERSION cuando cambies archivos. */
-const VERSION = 'ne-v4';
+const VERSION = 'ne-v5';
 const SHELL = ['/', '/index.html', '/repartidor.js', '/admin.js', '/push.js', '/manifest.json', '/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

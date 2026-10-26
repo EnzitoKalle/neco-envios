@@ -92,6 +92,19 @@
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Número de documento</label><input id="g-doc" inputmode="numeric" maxlength="15" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"></div>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Vehículo</label>
         <select id="g-veh" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="moto">🏍️ Moto</option><option value="bici">🚲 Bici</option><option value="auto">🚗 Auto</option></select></div>
+      <div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 space-y-2">
+        <p class="font-black text-sm text-slate-900">¿Cómo cobrás?</p>
+        <p class="text-[11px] text-slate-500">Los clientes te filtran por esto: completalo bien. Después lo podés cambiar en Ajustes.</p>
+        <label class="flex items-center gap-2 text-sm font-bold"><input id="g-ef" type="checkbox" class="w-5 h-5" checked> Acepto efectivo</label>
+        <label class="flex items-center gap-2 text-sm font-bold"><input id="g-tr" type="checkbox" class="w-5 h-5"> Acepto transferencia</label>
+        <div id="g-alias-box" class="hidden"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Tu alias o CBU para transferencias</label>
+          <input id="g-alias" maxlength="60" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="alias.ejemplo"></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo cobrás el envío?</label>
+          <select id="g-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="entrega">Al entregar (en destino)</option><option value="retiro">Al retirar</option><option value="ambos">Cualquiera (elige el cliente)</option></select></div>
+        <label class="flex items-start gap-2 text-sm font-bold"><input id="g-ad" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Manejo efectivo: puedo pagar el pedido en el comercio y cobrárselo al cliente al entregar</span></label>
+        <div id="g-ad-box" class="hidden"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto máximo que puedo adelantar ($)</label>
+          <input id="g-max" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 20000"></div>
+      </div>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Foto del DNI (frente)</label>
         <input id="g-dni" type="file" accept="image/*" class="block w-full text-xs mt-1"><p id="g-dni-ok" class="text-[11px] text-brand-600 font-bold"></p></div>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Foto de rostro (se toma ahora con la cámara)</label>
@@ -116,6 +129,8 @@
       c.toBlob(b => { R.rostro = b; $('g-prev').src = URL.createObjectURL(b); $('g-prev').classList.remove('hidden'); }, 'image/jpeg', 0.85);
       cerrarCamara(); v.classList.add('hidden'); $('g-cap').classList.add('hidden');
     };
+    $('g-tr').onchange = e => $('g-alias-box').classList.toggle('hidden', !e.target.checked);
+    $('g-ad').onchange = e => $('g-ad-box').classList.toggle('hidden', !e.target.checked);
     $('g-leer').onclick = () => mostrarLegal('terminos_rep');
     $('g-send').onclick = enviarRegistro;
   }
@@ -126,6 +141,11 @@
     if (doc.length < 6) return mostrarToast('Revisá el número de documento');
     if (!R.dni) return mostrarToast('Falta la foto del DNI');
     if (!R.rostro) return mostrarToast('Falta la foto de rostro con la cámara');
+    const ef = $('g-ef').checked, tr = $('g-tr').checked, ad = $('g-ad').checked, alias = $('g-alias').value.trim(), mx = Math.round(parseFloat($('g-max').value) || 0);
+    if (!ef && !tr) return mostrarToast('Elegí cómo cobrás: efectivo, transferencia o las dos');
+    if (tr && alias.length < 3) return mostrarToast('Poné tu alias o CBU para recibir transferencias');
+    if (ad && !(mx > 0 && mx <= 1000000)) return mostrarToast('Poné el monto máximo que podés adelantar');
+    const cobros = { acepta_efectivo: ef, acepta_transferencia: tr, alias_pago: tr ? alias : null, momento_cobro: $('g-mom').value, adelanta_pagos: ad, max_adelanto: ad ? mx : 0 };
     const b = $('g-send'); b.disabled = true; b.textContent = 'Enviando...';
     try {
       const ses = (await _sb.auth.getSession()).data.session;
@@ -138,9 +158,16 @@
       if (r.error) throw new Error('Subiendo DNI: ' + r.error.message);
       r = await _sb.storage.from('ne-rostros').upload(pRos, R.rostro, { contentType: 'image/jpeg' });
       if (r.error) throw new Error('Subiendo foto de rostro: ' + r.error.message);
-      r = (R.perfil && R.perfil.estado === 'eliminado')
-        ? await _sb.from('ne_repartidores').update({ nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos, estado: 'pendiente' }).eq('user_id', uid)
-        : await _sb.from('ne_repartidores').insert({ user_id: uid, nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos });
+      const base = { nombre: nom, documento: doc, vehiculo: veh, dni_path: pDni, rostro_path: pRos };
+      if (R.perfil && R.perfil.estado === 'eliminado') {
+        r = await _sb.from('ne_repartidores').update({ ...base, ...cobros, estado: 'pendiente' }).eq('user_id', uid);
+      } else {
+        r = await _sb.from('ne_repartidores').insert({ user_id: uid, ...base, ...cobros });
+        if (r.error) {   // por si la base no deja cargar los cobros en el alta: se crea el perfil y se completan enseguida
+          r = await _sb.from('ne_repartidores').insert({ user_id: uid, ...base });
+          if (!r.error) { const r2 = await _sb.from('ne_repartidores').update(cobros).eq('user_id', uid); if (r2.error) mostrarToast('Tu registro se envió, pero completá tus cobros en Ajustes.'); }
+        }
+      }
       if (r.error) throw new Error('Guardando datos: ' + r.error.message);
       mostrarToast('Registro enviado. Ahora elegí tus zonas y precios.'); R.tab = 'zonas'; pantalla();
     } catch (e) { mostrarToast('Error: ' + (e.message || e)); b.disabled = false; b.textContent = 'Enviar registro'; }

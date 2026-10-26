@@ -108,8 +108,26 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
   <!-- CLIENTE -->
   <section id="v-cliente" class="hidden space-y-4">
     <button onclick="irInicio()" type="button" class="text-xs font-bold text-brand-600 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver</button>
-    <h2 class="text-xl font-black text-slate-900">Solicitar envío</h2>
+    <h2 class="text-xl font-black text-slate-900">Pedí tu envío</h2>
     <div id="aviso-comercio" class="hidden bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold rounded-2xl px-4 py-3"></div>
+
+    <div class="clean-card rounded-3xl p-5 space-y-4">
+      <div id="dir-guardadas-box" class="hidden">
+        <p class="text-[11px] font-extrabold text-slate-500 uppercase">Tus direcciones · tocá una para usarla en <b id="ult-lbl" class="text-brand-700">el retiro</b></p>
+        <div id="dir-guardadas" class="flex flex-wrap gap-1.5 mt-1.5"></div>
+      </div>
+      <div>
+        <label for="in-r" class="text-sm font-black text-slate-800">📍 ¿Dónde retiramos?</label>
+        <input id="in-r" maxlength="150" autocomplete="off" enterkeyhint="next" class="clean-input w-full rounded-xl px-3 py-3 text-sm mt-1" placeholder="Calle y altura. Ej: 70 bis 3722">
+        <div id="zona-r" class="mt-1"></div>
+      </div>
+      <div>
+        <label for="in-e" class="text-sm font-black text-slate-800">🏁 ¿Dónde entregamos?</label>
+        <input id="in-e" maxlength="150" autocomplete="off" enterkeyhint="done" class="clean-input w-full rounded-xl px-3 py-3 text-sm mt-1" placeholder="Calle y altura. Ej: 62 2150">
+        <div id="zona-e" class="mt-1"></div>
+      </div>
+      <p class="text-[11px] text-slate-400">Escribí la calle y la altura como se dice acá, por ejemplo «70 bis 3722». Con eso alcanza, nosotros ubicamos la zona.</p>
+    </div>
 
     <div class="clean-card rounded-3xl p-5 space-y-3">
       <div class="grid grid-cols-2 gap-3">
@@ -119,39 +137,33 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
           <input id="c-wsp" inputmode="tel" maxlength="20" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="2262 ..."></div>
       </div>
       <p class="text-[11px] text-slate-400">Tu número no se muestra al repartidor: hablan por el chat de la app.</p>
-    </div>
-
-    <div class="clean-card rounded-3xl p-5 space-y-3">
-      <div class="flex gap-2">
-        <button id="sel-r" onclick="setActivo('r')" type="button" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">1 · Retiro</button>
-        <button id="sel-e" onclick="setActivo('e')" type="button" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">2 · Entrega</button>
-      </div>
-      <div>
-        <div class="flex gap-2"><input id="in-dir" maxlength="200" autocomplete="off" class="clean-input flex-1 min-w-0 rounded-xl px-3 py-2.5 text-sm" placeholder="Retiro: calle y altura (ej: 70 bis 3722)">
-          <button id="btn-buscar" type="button" title="Ubicar dirección" class="bg-brand-600 text-white rounded-xl px-3.5 active:scale-95"><i data-lucide="search" class="w-4 h-4"></i></button></div>
-        <p id="dir-est" class="text-[11px] text-amber-600 font-bold mt-1"></p>
-        <button id="btn-usar-texto" type="button" class="hidden mt-1 text-[11px] font-black text-brand-700 underline text-left">Usar lo que escribí como dirección (con el pin actual)</button>
-        <div id="dir-guardadas" class="flex flex-wrap gap-1.5 mt-2"></div>
-        <button id="btn-guardar-dir" type="button" class="hidden mt-1 text-[11px] font-black text-amber-700 underline text-left">💾 Guardar esta dirección (Casa, Trabajo…)</button>
-        <div id="dir-elegir" class="hidden flex gap-2 mt-2"><button id="btn-pin-a" type="button" class="flex-1 bg-brand-600 text-white text-xs font-black rounded-xl py-2.5 active:scale-95">Dejar mi pin</button><button id="btn-pin-b" type="button" class="flex-1 bg-slate-600 text-white text-xs font-black rounded-xl py-2.5 active:scale-95">Usar el pin gris (?)</button></div>
-        <button id="btn-confirmar" type="button" class="hidden w-full mt-2 bg-brand-600 text-white font-black text-sm rounded-xl py-2.5 active:scale-95">✓ El pin está bien ubicado</button>
-        <div id="sugerencias" class="suger hidden mt-1 bg-white border border-slate-200 rounded-xl shadow-lg"></div>
-      </div>
-      <p class="text-[11px] text-slate-400">Escribí como se dice acá: «70 bis 3722» o «62 2150», y tocá la lupa. Después revisá que el pin esté justo en tu casa (podés tocar el mapa o arrastrarlo).</p>
-      <div id="mapa"></div>
-      <div class="grid grid-cols-2 gap-2 text-[11px]">
-        <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Retiro</b><p id="res-r" class="text-slate-600 break-words">Sin elegir</p></div>
-        <div class="bg-slate-50 rounded-xl p-2.5"><b class="text-brand-600">Entrega</b><p id="res-e" class="text-slate-600 break-words">Sin elegir</p></div>
-      </div>
-      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cómo pagás el envío?</p><div id="pg-met" class="flex gap-1.5"><button type="button" data-v="efectivo" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">💵 Efectivo</button><button type="button" data-v="transferencia" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🏦 Transferencia</button></div></div>
-      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cuándo le pagás al repartidor?</p><div id="pg-mom" class="flex gap-1.5"><button type="button" data-v="retiro" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">En el retiro</button><button type="button" data-v="entrega" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">En la entrega</button></div></div>
-      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿El pedido (la compra) ya está pago?</p><div id="pg-pag" class="flex gap-1.5"><button type="button" data-v="si" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">Sí, ya está pago</button><button type="button" data-v="no" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">No, que lo pague el repartidor</button></div><div id="adel-box" class="hidden mt-2"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto que paga el repartidor en el comercio ($)</label><input id="adel-monto" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 15000"><p class="text-[11px] text-slate-400 mt-1">Se lo devolvés al repartidor cuando recibís el pedido. Solo aparecen repartidores que manejan efectivo y llegan a ese monto.</p></div></div>
-      <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Qué vehículo necesitás?</p><div id="filtro-veh" class="flex gap-1.5"><button type="button" data-v="todos" class="flex-1 text-xs font-black rounded-xl py-2 bg-brand-600 text-white">Cualquiera</button><button type="button" data-v="moto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🏍️ Moto</button><button type="button" data-v="auto" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚗 Auto</button><button type="button" data-v="bici" class="flex-1 text-xs font-black rounded-xl py-2 bg-slate-100 text-slate-600">🚲 Bici</button></div><p class="text-[11px] text-slate-400 mt-1">Para paquetes grandes o frágiles, elegí Auto.</p></div>
       <label id="tc-box" class="flex items-start gap-2 text-xs font-bold text-slate-700"><input id="tc-ok" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Estoy de acuerdo con los <button type="button" id="tc-leer" class="underline text-brand-700 font-black">Términos y condiciones</button></span></label>
-      <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Consultar repartidores disponibles</button>
+      <button id="btn-consultar" onclick="consultar()" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98] flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Ver repartidores disponibles</button>
     </div>
     <p id="err-sol" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3"></p>
-    <div id="lista-rep" class="space-y-3"></div>
+
+    <div id="res-box" class="hidden space-y-3">
+      <div class="clean-card rounded-3xl p-5 space-y-3">
+        <div><p class="font-black text-slate-900 text-sm">Filtrá según lo que necesites</p>
+          <p class="text-[11px] text-slate-500">Le pagás directo al repartidor que elijas. Estos filtros muestran solo a los que se ajustan a vos.</p></div>
+        <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Cómo querés pagar el envío?</p>
+          <div id="f-met" class="flex gap-1.5"><button type="button" data-v="todos">Cualquiera</button><button type="button" data-v="efectivo">💵 Efectivo</button><button type="button" data-v="transferencia">🏦 Transferencia</button></div></div>
+        <div class="space-y-1.5">
+          <button id="f-destino" type="button" class="w-full text-left text-xs font-black rounded-xl px-3 py-2.5"></button>
+          <button id="f-adel" type="button" class="w-full text-left text-xs font-black rounded-xl px-3 py-2.5"></button>
+          <div id="f-adel-box" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <label class="text-[11px] font-extrabold text-slate-600 uppercase">¿Cuánto cuesta tu compra? ($)</label>
+            <input id="f-adel-monto" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 15000">
+            <p class="text-[11px] text-slate-500 mt-1">El repartidor paga eso en el comercio y vos se lo devolvés cuando te llega el pedido. Te mostramos solo a los que manejan efectivo y llegan a ese monto.</p>
+          </div>
+        </div>
+        <div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">¿Qué vehículo necesitás?</p>
+          <div id="f-veh" class="flex gap-1.5"><button type="button" data-v="todos">Cualquiera</button><button type="button" data-v="moto">🏍️ Moto</button><button type="button" data-v="auto">🚗 Auto</button><button type="button" data-v="bici">🚲 Bici</button></div>
+          <p class="text-[11px] text-slate-400 mt-1">Para paquetes grandes o frágiles, elegí Auto.</p></div>
+      </div>
+      <p id="rep-cant" class="text-xs font-bold text-slate-500 px-1"></p>
+      <div id="lista-rep" class="space-y-3"></div>
+    </div>
   </section>
 
   <!-- REPARTIDOR (se completa en la Parte 2B) -->
@@ -181,6 +193,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
       <input id="ch-input" maxlength="1000" class="clean-input flex-1 rounded-xl px-3 py-2.5 text-sm" placeholder="Escribí un mensaje...">
       <button onclick="enviarMsg()" type="button" class="bg-brand-600 text-white rounded-xl px-4 active:scale-95"><i data-lucide="send" class="w-4 h-4"></i></button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRMAR PEDIDO -->
+<div id="modal-conf" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+  <div class="clean-modal rounded-3xl p-5 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-start"><h3 class="text-base font-black text-slate-900">Confirmá tu pedido</h3>
+      <button onclick="cerrarModal('modal-conf')" type="button" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+    <div id="conf-cont" class="space-y-3"></div>
+    <button id="conf-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98]">Confirmar y pedir</button>
   </div>
 </div>
 
@@ -253,9 +275,8 @@ async function loginGoogle(){
 }
 _sb.auth.onAuthStateChange((_e, s) => { if (s) { sesion = s; pintarLogin(); } });
 
-/* ============ ZONAS + MAPA ============ */
-let zonas = [], mapa, capaZonas, activo = 'r';
-const pts = { r:null, e:null }, marks = { r:null, e:null }, okp = { r:false, e:false }, marksAlt = { r:null, e:null }, altPts = { r:null, e:null };
+/* ============ ZONAS (el mapa ya no se muestra: solo se usa para calcular la zona) ============ */
+let zonas = [];
 function rgbaOk(c){ return /^rgba?\([\d\s.,]+\)$/.test(c||'') ? c : '#12896f'; }
 function enPoligono(lat, lng, geo){
   const ring = geo.coordinates[0]; let dentro = false;
@@ -276,37 +297,6 @@ async function cargarZonas(){
   if (cache && cache.length) { zonas = cache; pedir(); return; }   // usa lo guardado y actualiza en segundo plano
   await pedir();
 }
-let zonasDibujadas = false;
-function dibujarZonas(){
-  if (zonasDibujadas || !mapa || !zonas.length) return; zonasDibujadas = true;
-  zonas.forEach(z => L.geoJSON(z.geojson, { style:{ color:rgbaOk(z.color), weight:1.5, fillOpacity:.12 } }).bindTooltip(z.nombre, {sticky:true}).addTo(capaZonas));
-}
-function iniciarMapa(){
-  if (mapa) { setTimeout(()=>mapa.invalidateSize(), 100); return; }
-  mapa = L.map('mapa').setView([-38.56, -58.74], 12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap', keepBuffer:4, updateWhenIdle:true, updateWhenZooming:false }).addTo(mapa);
-  capaZonas = L.layerGroup().addTo(mapa);
-  mapa.on('click', e => {
-    const cur = pts[activo]; let keep = null;
-    if (cur && cur.dir !== PUNTO) keep = cur.dir;                       // mover el pin NO cambia el texto de la dirección
-    else { const p = parseDir($('in-dir').value); if (p && p.altura) keep = p.texto; }
-    ponerPunto(activo, e.latlng.lat, e.latlng.lng, keep, false, false);
-  });
-}
-function setActivo(k){
-  activo = k;
-  $('sel-r').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='r' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
-  $('sel-e').className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (k==='e' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
-  $('in-dir').placeholder = k==='r' ? 'Retiro: calle y altura (ej: 70 bis 3722)' : 'Entrega: calle y altura (ej: 62 2150)';
-  $('in-dir').value = pts[k] ? pts[k].dir : ''; $('sugerencias').classList.add('hidden'); $('dir-est').textContent = ''; clearTimeout(sugT); busqId++; $('dir-elegir').classList.toggle('hidden', !altPts[k]); revisarTexto();
-}
-function pintarResumen(){
-  revisarTexto();
-  ['r','e'].forEach(k => {
-    const p = pts[k]; const z = p ? zonaDe(p.lat, p.lng) : null;
-    $('res-'+k).textContent = !p ? 'Sin elegir' : ((okp[k] ? '✓ ' : '⚠ sin confirmar · ') + (p.dir === PUNTO ? 'falta calle y altura' : p.dir.slice(0,60)) + (z ? ' · ' + z : ' · ⚠ fuera de zona'));
-  });
-}
 // Cola para Nominatim (el servicio gratuito pide 1 consulta por segundo): evita bloqueos al hacer varias cosas juntas
 let nomQ = Promise.resolve();
 function nom(url){
@@ -320,34 +310,7 @@ function nom(url){
   nomQ = p.then(() => new Promise(r => setTimeout(r, 1100)), () => new Promise(r => setTimeout(r, 1100)));
   return p;
 }
-const BUSCANDO = 'Buscando dirección…';
-const PUNTO = 'Punto en el mapa';
 function mkIcon(color, letra){ return L.divIcon({ className:'', html:`<div style="background:${color};color:#fff;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"><b style="transform:rotate(45deg);font-size:12px">${letra}</b></div>`, iconSize:[28,28], iconAnchor:[14,28] }); }
-function quitarAlt(k){ if (marksAlt[k]) { mapa.removeLayer(marksAlt[k]); marksAlt[k] = null; } altPts[k] = null; if (k === activo) $('dir-elegir').classList.add('hidden'); }
-function mostrarAlt(k, alt){
-  altPts[k] = alt;
-  marksAlt[k] = L.marker([alt.lat, alt.lng], { icon: mkIcon('#64748b', '?') }).addTo(mapa);
-  marksAlt[k].on('click', () => usarAlt(k));
-  if (k === activo) $('dir-elegir').classList.remove('hidden');
-  mapa.fitBounds([[pts[k].lat, pts[k].lng], [alt.lat, alt.lng]], { padding:[40,40], maxZoom:17 });
-  revisarTexto();
-}
-function usarAlt(k){ const a = altPts[k]; if (!a) return; ponerPunto(k, a.lat, a.lng, pts[k].dir, false, false); }
-// confirmado = true cuando la persona puso/movió el pin a mano o eligió entre dos pines
-async function ponerPunto(k, lat, lng, dir, reverse, confirmado){
-  quitarAlt(k);
-  pts[k] = { lat, lng, dir: dir || PUNTO }; okp[k] = !!confirmado;
-  if (!marks[k]) {
-    marks[k] = L.marker([lat,lng], { draggable:true, icon: mkIcon(k==='r' ? '#0b6e5a' : '#f59e0b', k==='r' ? 'R' : 'E') }).addTo(mapa);
-    marks[k].on('dragend', e => { const p = e.target.getLatLng(); ponerPunto(k, p.lat, p.lng, pts[k] ? pts[k].dir : null, false, false); });
-  } else marks[k].setLatLng([lat,lng]);
-  if (k === activo) {
-    $('in-dir').value = pts[k].dir === PUNTO ? '' : pts[k].dir;
-    setEst('', false);
-    if (pts[k].dir === PUNTO) setEst('Escribí la calle y la altura (ej: 70 bis 3722) y tocá «Usar lo que escribí».', false);
-  }
-  pintarResumen();
-}
 function fixDir(s){ return String(s||'').replace(/^\s*(\d+[a-zA-Z]?)\s*,\s*([^,]+)(.*)$/, '$2 $1$3'); }
 function formatDir(it){
   const a = it.address || {};
@@ -360,11 +323,6 @@ function urlBusqueda(q, limite){
   const qq = /necochea|quequ/i.test(q) ? q : q + ', Necochea';
   return `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${limite}&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
 }
-function elegirResultado(it){
-  $('sugerencias').classList.add('hidden'); $('dir-est').textContent = '';
-  ponerPunto(activo, it.lat, it.lng, it.texto, false); mapa.setView([it.lat, it.lng], 16);
-}
-/* Fuentes de direcciones: 1) Georef (datos oficiales de Argentina, con alturas)  2) OpenStreetMap como respaldo */
 function tituloCalle(c){
   const n = String((c && c.nombre) || '').trim();
   if (/^\d+$/.test(n)) return 'Calle ' + n;
@@ -393,7 +351,6 @@ async function buscarFuente(q, limite){
   if (j === null && g === null) return null;      // fallaron las dos fuentes
   return (j || []).map(it => ({ lat: +it.lat, lng: +it.lon, texto: formatDir(it) }));
 }
-function setEst(msg, ok){ const e = $('dir-est'); e.textContent = msg; e.className = 'text-[11px] font-bold mt-1 ' + (ok ? 'text-brand-600' : 'text-amber-600'); }
 function dist(a, b){ const R = 6371000, rad = x => x * Math.PI / 180, dLa = rad(b.lat - a.lat), dLo = rad(b.lng - a.lng);
   const h = Math.sin(dLa/2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLo/2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
 // Entiende como se habla acá: "70 3722", "calle 70 bis 3722", "av 59 1234", "62 bis, 2150"
@@ -412,173 +369,7 @@ async function buscarNumerica(p){
   const [A, B] = await Promise.all([getA(), getB()]);
   return { A, B };
 }
-let guardadas = [];
-async function cargarGuardadas(){ try { const { data } = await _sb.from('ne_direcciones').select('id,nombre,dir,lat,lng').order('id'); guardadas = Array.isArray(data) ? data : []; } catch (e) { guardadas = []; } pintarGuardadas(); }
-function pintarGuardadas(){
-  const box = $('dir-guardadas'); box.innerHTML = '';
-  guardadas.forEach(g => {
-    const w = document.createElement('span'); w.className = 'inline-flex items-center bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-800';
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'px-3 py-1.5'; b.textContent = (/casa/i.test(g.nombre) ? '🏠 ' : /trabajo/i.test(g.nombre) ? '💼 ' : '📍 ') + g.nombre; b.onclick = () => usarGuardada(g);
-    const x = document.createElement('button'); x.type = 'button'; x.className = 'pr-2.5 text-amber-500'; x.textContent = '×'; x.title = 'Borrar';
-    x.onclick = async () => { if (!confirm('¿Borrar «' + g.nombre + '»?')) return; await _sb.from('ne_direcciones').delete().eq('id', g.id); cargarGuardadas(); };
-    w.appendChild(b); w.appendChild(x); box.appendChild(w);
-  });
-  revisarTexto();
-}
-function usarGuardada(g){ mapa.setView([g.lat, g.lng], 16); ponerPunto(activo, g.lat, g.lng, g.dir, false, true); setEst('✅ Usando «' + g.nombre + '». Si algo cambió, mové el pin.', true); }
-async function guardarDirActual(){
-  const c = pts[activo]; if (!c || c.dir === PUNTO) return;
-  if (guardadas.length >= 8) return mostrarToast('Ya tenés 8 direcciones guardadas: borrá alguna con la ×');
-  const sug = guardadas.some(g => /casa/i.test(g.nombre)) ? (guardadas.some(g => /trabajo/i.test(g.nombre)) ? '' : 'Trabajo') : 'Casa';
-  const nombre = (prompt('¿Con qué nombre la guardamos? (ej: Casa, Trabajo, Local)', sug) || '').trim().slice(0, 30); if (!nombre) return;
-  const { error } = await _sb.from('ne_direcciones').insert({ user_id: sesion.user.id, nombre, dir: c.dir, lat: c.lat, lng: c.lng });
-  if (error) return mostrarToast('No se pudo guardar: ' + error.message);
-  mostrarToast('¡Guardada! 💚'); cargarGuardadas();
-}
-let sugT, busqId = 0;
-// directo = true: usa la lupa/Enter. Mientras escribe, solo sugiere si es una dirección con nombre.
-async function buscarDir(q, directo){
-  const box = $('sugerencias');
-  if (q.trim().length < 4) { box.classList.add('hidden'); setEst('', false); return; }
-  const p = parseDir(q);
-  if (p) {
-    box.classList.add('hidden');
-    if (!p.altura) { setEst('Falta la altura. Ejemplo: 70 bis 3722', false); return; }
-    if (!directo) { setEst('Tocá la lupa 🔍 para ubicar «' + p.texto + '»', false); return; }
-    const mi = ++busqId; setEst('Buscando…', false);
-    const { A, B } = await buscarNumerica(p);
-    if (mi !== busqId) return;
-    if (!A && !B) { setEst('No encontramos «' + p.texto + '» en los mapas. Tocá en el mapa donde queda: la dirección que escribiste se guarda igual.', false);
-      if (pts[activo]) { /* mantiene el pin actual */ } else { pts[activo] = null; } return; }
-    if (A && B) {
-      const d = dist(A, B);
-      if (d <= 120) { ponerPunto(activo, A.lat, A.lng, p.texto, false, false); mapa.setView([A.lat, A.lng], 17); setEst('✅ Los dos mapas coinciden. Confirmá con el botón verde que el pin está bien.', true); }
-      else { ponerPunto(activo, A.lat, A.lng, p.texto, false, false); mostrarAlt(activo, { lat: B.lat, lng: B.lng }); setEst('Los dos mapas no coinciden (a ' + Math.round(d) + ' m). Elegí cuál pin es el correcto, o arrastralo.', false); }
-    } else {
-      const X = A || B; ponerPunto(activo, X.lat, X.lng, p.texto, false, false); mapa.setView([X.lat, X.lng], 17);
-      setEst('Revisá que el pin esté justo en «' + p.texto + '» y confirmá.', false);
-    }
-    return;
-  }
-  const mi = ++busqId; setEst('Buscando…', false);
-  const j = await buscarFuente(q, 5);
-  if (mi !== busqId) return;
-  box.innerHTML = '';
-  if (j === null) { setEst('No pudimos buscar ahora. Tocá el mapa donde queda, escribí calle y altura y tocá «Usar lo que escribí».', false); box.classList.add('hidden'); return; }
-  if (!j.length) { setEst('No encontramos esa dirección. Escribila como «70 bis 3722» o tocá el mapa donde queda.', false); box.classList.add('hidden'); return; }
-  setEst('', false);
-  if (directo) { elegirResultado(j[0]); return; }
-  j.forEach(it => {
-    const b = document.createElement('button'); b.type = 'button';
-    b.className = 'block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-brand-50 border-b border-slate-100 last:border-0';
-    b.textContent = it.texto; b.onclick = () => elegirResultado(it); box.appendChild(b);
-  });
-  box.classList.remove('hidden');
-}
-function revisarTexto(){
-  const t = $('in-dir').value.trim(), c = pts[activo], eleg = !$('dir-elegir').classList.contains('hidden');
-  $('btn-usar-texto').classList.toggle('hidden', !(c && t.length >= 3 && t !== c.dir && c.dir !== BUSCANDO));
-  $('btn-confirmar').classList.toggle('hidden', !(c && !okp[activo] && c.dir !== BUSCANDO && !eleg));
-  $('btn-guardar-dir').classList.toggle('hidden', !(c && okp[activo] && c.dir !== PUNTO && c.dir !== BUSCANDO && !guardadas.some(g => g.dir === c.dir && Math.abs(g.lat - c.lat) < 1e-5)));
-}
-$('in-dir').addEventListener('input', e => { revisarTexto(); clearTimeout(sugT); const q = e.target.value; sugT = setTimeout(() => buscarDir(q, false), 700); });
-$('in-dir').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(sugT); buscarDir($('in-dir').value, true); } });
-$('btn-usar-texto').addEventListener('click', () => {
-  const t = $('in-dir').value.trim().slice(0, 200), c = pts[activo]; if (!c || t.length < 3) return;
-  const pd = parseDir(t); c.dir = (pd && pd.altura) ? pd.texto : t; $('in-dir').value = c.dir; setEst('', false); pintarResumen(); mostrarToast('Dirección guardada con el pin que marcaste');
-});
-$('btn-guardar-dir').addEventListener('click', guardarDirActual);
-$('btn-confirmar').addEventListener('click', () => { okp[activo] = true; pintarResumen(); mostrarToast('Pin confirmado'); if (activo === 'r' && !pts.e) setActivo('e'); });
-$('btn-pin-a').addEventListener('click', () => { okp[activo] = true; quitarAlt(activo); pintarResumen(); mostrarToast('Pin confirmado'); });
-$('btn-pin-b').addEventListener('click', () => usarAlt(activo));
-$('btn-buscar').addEventListener('click', () => { clearTimeout(sugT); buscarDir($('in-dir').value, true); });
-
-async function geocodificar(q){ const j = await buscarFuente(q, 1); return (j && j[0]) || null; }
-/* ============ FLUJO CLIENTE ============ */
-let paramsAplicados = false, comercioParam = '';
-async function irCliente(){
-  vista('cliente');
-  iniciarMapa();                                                     // el mapa y sus fotos empiezan a cargar YA
-  const pSes = asegurarSesion().then(() => true, () => false), pZon = zonas.length ? Promise.resolve() : cargarZonas();
-  const [okSes] = await Promise.all([pSes, pZon]);
-  if (!okSes) return;
-  dibujarZonas(); ico();
-  tcAceptados = await aceptoTerminos('cliente'); $('tc-box').classList.toggle('hidden', tcAceptados);
-  cargarGuardadas();
-  $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
-  $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
-  if (!paramsAplicados) { paramsAplicados = true; await aplicarParams(); }
-}
-
-async function aplicarParams(){
-  const sp = new URLSearchParams(location.search);
-  const ret = (sp.get('retiro')||'').slice(0,200), ent = (sp.get('entrega')||'').slice(0,200);
-  comercioParam = (sp.get('comercio')||'').slice(0,80);
-  if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
-  for (const [k, q] of [['r', ret], ['e', ent]]) {
-    if (!q) continue;
-    try { const g = await geocodificar(q); if (g) await ponerPunto(k, g.lat, g.lng, q, false); else { pts[k] = null; } } catch(e){}
-    if (!pts[k]) { $('res-'+k).textContent = q + ' (marcalo en el mapa)'; }
-  }
-  if (ret) setActivo('r');
-  const f = pts.r || pts.e; if (f) mapa.setView([f.lat, f.lng], 14);
-}
-async function consultar(){
-  const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
-  if (nombre.length < 2) return mostrarToast('Contanos tu nombre 🙂');
-  if (wsp.replace(/\D/g,'').length < 6) return mostrarToast('Dejanos tu WhatsApp para coordinar el envío');
-  if (!tcAceptados) {
-    if (!$('tc-ok').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» con los términos para continuar');
-    const ac = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'cliente', p_version: TERMINOS_VERSION });
-    if (ac.error) return mostrarToast('No se pudo guardar la aceptación: ' + ac.error.message);
-    tcAceptados = true; $('tc-box').classList.add('hidden');
-  }
-  const txt = $('in-dir').value.trim(), cur = pts[activo];
-  if (txt && (!cur || cur.dir !== txt)) return mostrarToast('Tocá la lupa 🔍 (o elegí una opción) para ubicar la dirección que escribiste');
-  if ((pts.r && pts.r.dir === BUSCANDO) || (pts.e && pts.e.dir === BUSCANDO)) return mostrarToast('Esperá un segundo, estamos buscando la dirección');
-  if (!pts.r || !pts.e) return mostrarToast('Elegí retiro y entrega');
-  if (pts.r.dir === PUNTO || pts.e.dir === PUNTO) return mostrarToast('Escribí la calle y la altura (ej: 70 bis 3722) y tocá «Usar lo que escribí»');
-  if (!okp.r || !okp.e) return mostrarToast('Confirmá con el botón verde que los dos pines estén bien ubicados');
-  if (!zonaDe(pts.r.lat, pts.r.lng)) return mostrarToast('El retiro está fuera de nuestras zonas');
-  if (!zonaDe(pts.e.lat, pts.e.lng)) return mostrarToast('La entrega está fuera de nuestras zonas');
-  localStorage.setItem('ne_nombre', nombre); localStorage.setItem('ne_wsp', wsp);
-  const btn = $('btn-consultar'); btn.disabled = true; $('err-sol').classList.add('hidden');
-  try {
-    await asegurarSesion();
-    let adel = 0;
-    if (pagoAdelanto) { adel = Math.round(parseFloat($('adel-monto').value)); if (!(adel > 0 && adel <= 1000000)) { btn.disabled = false; return mostrarToast('Poné cuánto tiene que pagar el repartidor en el comercio'); } }
-    adelConsultado = adel;
-    const { data, error } = await _sb.rpc('ne_listar_repartidores', { r_lat:pts.r.lat, r_lng:pts.r.lng, e_lat:pts.e.lat, e_lng:pts.e.lng, p_metodo:pagoMetodo, p_momento:pagoMomento, p_adelanto:adel });
-    if (error) throw error;
-    pintarRepartidores(data || []);
-  } catch(e){ mostrarToast('Error: ' + (e.message || e)); }
-  btn.disabled = false;
-}
 const VEH = { moto:'🏍️ Moto', bici:'🚲 Bici', auto:'🚗 Auto' };
-let filtroVeh = 'todos', ultimaLista = [], pagoMetodo = 'efectivo', pagoMomento = 'entrega', pagoAdelanto = false, adelConsultado = 0;
-function pintarRepartidores(lista){
-  if (lista) ultimaLista = lista;
-  lista = ultimaLista.filter(r => filtroVeh === 'todos' || r.vehiculo === filtroVeh);
-  const box = $('lista-rep'); box.innerHTML = '';
-  if (!lista.length) { box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + (ultimaLista.length ? 'No hay repartidores con ese vehículo para este recorrido ahora. Probá con «Cualquiera».' : 'Ahora no hay repartidores libres para ese recorrido 😕 Probá en unos minutos, o cambiá el vehículo o la forma de pago.') + '</div>'; return; }
-  lista.forEach(r => {
-    const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
-    const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 flex items-center gap-3';
-    d.innerHTML = `<img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
-      <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>${r.comparte_ubicacion ? '<p class="text-[10px] font-black text-brand-700">📍 Seguimiento en vivo</p>' : ''}
-      <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo]||r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p><p class="text-[10px] text-slate-500">${pagoMetodo === 'transferencia' ? '🏦 Transferencia' : '💵 Efectivo'} · ${pagoMomento === 'retiro' ? 'en el retiro' : 'en la entrega'}${adelConsultado > 0 ? ' · adelanta ' + money(adelConsultado) : ''}</p></div>
-      <div class="text-right"><p class="font-black text-lg text-brand-600">${money(r.precio)}</p>
-      <button type="button" class="mt-1 bg-brand-600 text-white text-xs font-black px-3 py-1.5 rounded-xl active:scale-95">Solicitar</button></div>`;
-    d.querySelector('button').onclick = ev => solicitar(r, ev.currentTarget);
-    box.appendChild(d);
-  });
-}
-function mostrarError(m){ const e = $('err-sol'); e.textContent = m; e.classList.remove('hidden'); e.scrollIntoView({ behavior:'smooth', block:'center' }); mostrarToast(m); }
-document.querySelectorAll('#filtro-veh [data-v]').forEach(b => b.addEventListener('click', () => {
-  filtroVeh = b.dataset.v;
-  document.querySelectorAll('#filtro-veh [data-v]').forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === filtroVeh ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
-  if (ultimaLista.length) pintarRepartidores();
-}));
 // Borra las fotos (DNI y rostro) de un repartidor en el almacenamiento. Devuelve cuántos archivos no se pudieron borrar.
 async function borrarArchivosRep(uid){
   let fallos = 0;
@@ -590,19 +381,6 @@ async function borrarArchivosRep(uid){
   }
   return fallos;
 }
-function limpiarLista(){ ultimaLista = []; $('lista-rep').innerHTML = ''; }
-const chipsRepintar = [];
-function chipsGrupo(id, valor, alElegir){
-  const bs = document.querySelectorAll('#' + id + ' [data-v]');
-  const pintar = () => bs.forEach(x => { x.className = 'flex-1 text-xs font-black rounded-xl py-2 ' + (x.dataset.v === valor() ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'); });
-  bs.forEach(b => b.addEventListener('click', () => { alElegir(b.dataset.v); pintar(); limpiarLista(); }));
-  chipsRepintar.push(pintar);
-  pintar();
-}
-chipsGrupo('pg-met', () => pagoMetodo, v => { pagoMetodo = v; });
-chipsGrupo('pg-mom', () => pagoMomento, v => { pagoMomento = v; });
-chipsGrupo('pg-pag', () => pagoAdelanto ? 'no' : 'si', v => { pagoAdelanto = (v === 'no'); $('adel-box').classList.toggle('hidden', !pagoAdelanto); });
-$('tc-leer').addEventListener('click', () => mostrarLegal('terminos'));
 // Resumen de cómo se paga (lo usan el cliente, el repartidor y el chat)
 function resumenPago(p, esCli){
   const met = p.pago_envio_metodo === 'transferencia' ? 'transferencia' : 'efectivo';
@@ -616,25 +394,299 @@ function resumenPago(p, esCli){
   }
   return h;
 }
-async function solicitar(r, btn){
-  const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Solicitando…'; $('err-sol').classList.add('hidden');
-  let id = null;
-  try {
-    const { data, error } = await _sb.rpc('ne_crear_pedido', {
-      p_rep:r.repartidor_id, p_nombre:$('c-nombre').value.trim(), p_whatsapp:$('c-wsp').value.trim(), p_comercio:comercioParam,
-      r_dir:pts.r.dir, r_lat:pts.r.lat, r_lng:pts.r.lng, e_dir:pts.e.dir, e_lat:pts.e.lat, e_lng:pts.e.lng, p_metodo:pagoMetodo, p_momento:pagoMomento, p_adelanto:adelConsultado });
-    if (error) throw error;
-    id = data;
-  } catch(e){
-    let m = (e && e.message) || 'No se pudo solicitar el envío';
-    if (/3 pedidos/.test(m)) m += '. Cancelá los viejos desde el ícono del reloj (Mis pedidos).';
-    mostrarError(m); btn.disabled = false; btn.textContent = txt;
-    if (/ya no está disponible/.test(m)) consultar();
+/* ============ DIRECCIONES: el cliente solo escribe; el mapa trabaja escondido y calcula la zona ============ */
+const zonaObj = (lat, lng) => zonas.find(z => enPoligono(lat, lng, z.geojson)) || null;
+// Un punto seguro dentro de una zona (para cuando la persona elige la zona a mano)
+function puntoEnZona(z){
+  const ring = z.geojson.coordinates[0]; let sx = 0, sy = 0; ring.forEach(p => { sx += p[0]; sy += p[1]; });
+  const c = { lng: sx / ring.length, lat: sy / ring.length };
+  if (enPoligono(c.lat, c.lng, z.geojson)) return c;
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  for (let i = 1; i <= 20; i++) for (let j = 1; j <= 20; j++) { const lng = x0 + (x1 - x0) * i / 21, lat = y0 + (y1 - y0) * j / 21; if (enPoligono(lat, lng, z.geojson)) return { lat, lng }; }
+  return { lat: ring[0][1], lng: ring[0][0] };
+}
+const D = { r:null, e:null };                          // {lat,lng,dir,zona,zid,aprox}
+const estD = { r:{ t:'vacio' }, e:{ t:'vacio' } };     // vacio | buscando | ok | elegir
+const seqD = { r:0, e:0 }, pendD = { r:null, e:null }, timD = { r:null, e:null };
+let ultimoCampo = 'r', guardadas = [];
+const SUF_APROX = ' (ubicación aproximada)';
+const dirFinal = k => D[k].dir + (D[k].aprox ? SUF_APROX : '');
+function dirTexto(k){ const t = $('in-' + k).value.trim(), p = parseDir(t); return ((p && p.altura) ? p.texto : t).slice(0, 150); }
+function setEstD(k, t, msg){ estD[k] = { t, msg }; pintarZonaDir(k); }
+function pintarZonaDir(k){
+  const box = $('zona-' + k), s = estD[k];
+  if (s.t === 'vacio') { box.innerHTML = ''; return; }
+  if (s.t === 'buscando') { box.innerHTML = '<p class="text-[11px] font-bold text-slate-400">Buscando…</p>'; return; }
+  if (s.t === 'ok') {
+    const yaGuardada = guardadas.some(g => g.dir === D[k].dir && Math.abs(g.lat - D[k].lat) < 1e-5);
+    box.innerHTML = '<p class="text-[11px] font-bold text-brand-700">✓ Zona: ' + esc(D[k].zona) + ' <button type="button" data-cambiar class="underline text-slate-500 font-bold ml-1">No es esa</button>' +
+      (!D[k].aprox && !yaGuardada ? ' <button type="button" data-guardar class="underline text-amber-700 font-bold ml-1">💾 Guardar</button>' : '') + '</p>';
+    box.querySelector('[data-cambiar]').onclick = () => setEstD(k, 'elegir', 'Elegí la zona donde queda:');
+    const g = box.querySelector('[data-guardar]'); if (g) g.onclick = () => guardarDir(k);
     return;
   }
-  try { $('lista-rep').innerHTML = ''; await abrirChat(id); }
-  catch(e){ mostrarError('Tu pedido se creó, pero no pudimos abrir el chat. Mirá el ícono del reloj (Mis pedidos). Detalle: ' + ((e && e.message) || e)); }
+  const ops = zonas.map(z => '<option value="' + esc(z.id) + '"' + (D[k] && String(D[k].zid) === String(z.id) ? ' selected' : '') + '>' + esc(z.nombre) + '</option>').join('');
+  box.innerHTML = '<p class="text-[11px] font-bold text-amber-600">' + esc(s.msg || 'Elegí la zona donde queda:') + '</p>' +
+    '<select class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="">Elegí la zona…</option>' + ops + '</select>';
+  box.querySelector('select').onchange = e => { if (e.target.value) elegirZona(k, e.target.value); };
 }
+function elegirZona(k, id){
+  const z = zonas.find(x => String(x.id) === String(id)); if (!z) return;
+  const txt = dirTexto(k); if (txt.length < 3) { mostrarToast('Escribí la calle y la altura'); return; }
+  if (D[k] && String(D[k].zid) === String(z.id)) { D[k].dir = txt; }
+  else { const p = puntoEnZona(z); D[k] = { lat: p.lat, lng: p.lng, dir: txt, zona: z.nombre, zid: z.id, aprox: true }; }
+  setEstD(k, 'ok'); limpiarLista();
+}
+// Pone una dirección ya conocida (guardada, repetir pedido, link de un comercio)
+function fijarDir(k, dir, lat, lng){
+  seqD[k]++; pendD[k] = null; clearTimeout(timD[k]);
+  const z = (isFinite(lat) && isFinite(lng)) ? zonaObj(lat, lng) : null;
+  if (z) { D[k] = { lat, lng, dir: String(dir).slice(0, 150), zona: z.nombre, zid: z.id, aprox: false }; setEstD(k, 'ok'); }
+  else { D[k] = null; setEstD(k, 'elegir', 'Elegí la zona donde queda:'); }
+  limpiarLista();
+}
+// Texto → coordenadas, consultando dos fuentes a la vez (Georef y OpenStreetMap)
+async function resolverDir(q){
+  const p = parseDir(q);
+  if (p && !p.altura) return { falta: true };
+  if (p && p.altura) {
+    const { A, B } = await buscarNumerica(p);
+    if (A && B) { const za = zonaObj(A.lat, A.lng), zb = zonaObj(B.lat, B.lng); return { lat: A.lat, lng: A.lng, dudosa: dist(A, B) > 250 && (!za || !zb || za.id !== zb.id) }; }
+    const X = A || B; return X ? { lat: X.lat, lng: X.lng, dudosa: false } : null;
+  }
+  const j = await buscarFuente(q, 1);
+  return (j && j[0]) ? { lat: j[0].lat, lng: j[0].lng, dudosa: false } : null;
+}
+function ubicar(k){
+  clearTimeout(timD[k]);
+  const txt = $('in-' + k).value.trim(), mi = ++seqD[k];
+  D[k] = null; limpiarLista();
+  if (txt.length < 4) { setEstD(k, 'vacio'); pendD[k] = null; return Promise.resolve(); }
+  setEstD(k, 'buscando');
+  const p = (async () => {
+    let res = null; try { res = await resolverDir(txt); } catch (e) {}
+    if (mi !== seqD[k]) return;
+    pendD[k] = null;
+    if (res && res.falta) return setEstD(k, 'elegir', 'Falta la altura (ej: 70 bis 3722). O elegí la zona donde queda:');
+    if (!res) return setEstD(k, 'elegir', 'No encontramos esa dirección. Elegí la zona donde queda y la usamos igual:');
+    const z = zonaObj(res.lat, res.lng);
+    if (!z) return setEstD(k, 'elegir', 'Esa dirección parece estar fuera de nuestras zonas. Si es un error, elegí la zona:');
+    D[k] = { lat: res.lat, lng: res.lng, dir: dirTexto(k), zona: z.nombre, zid: z.id, aprox: false };
+    if (res.dudosa) setEstD(k, 'elegir', 'No estamos seguros de la zona. Confirmala:'); else setEstD(k, 'ok');
+  })();
+  pendD[k] = p; return p;
+}
+['r', 'e'].forEach(k => {
+  const el = $('in-' + k);
+  el.addEventListener('focus', () => { ultimoCampo = k; $('ult-lbl').textContent = k === 'r' ? 'el retiro' : 'la entrega'; });
+  el.addEventListener('input', () => {
+    D[k] = null; seqD[k]++; pendD[k] = null; limpiarLista(); setEstD(k, 'vacio');
+    clearTimeout(timD[k]); timD[k] = setTimeout(() => ubicar(k), 1100);
+  });
+  el.addEventListener('blur', () => { if (!D[k] && !pendD[k] && estD[k].t === 'vacio' && el.value.trim().length >= 4) ubicar(k); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ubicar(k); if (k === 'r') $('in-e').focus(); else el.blur(); } });
+});
+
+/* ---- Direcciones guardadas (Casa, Trabajo…) ---- */
+async function cargarGuardadas(){ try { const { data } = await _sb.from('ne_direcciones').select('id,nombre,dir,lat,lng').order('id'); guardadas = Array.isArray(data) ? data : []; } catch (e) { guardadas = []; } pintarGuardadas(); }
+function pintarGuardadas(){
+  const box = $('dir-guardadas'); box.innerHTML = '';
+  $('dir-guardadas-box').classList.toggle('hidden', !guardadas.length);
+  guardadas.forEach(g => {
+    const w = document.createElement('span'); w.className = 'inline-flex items-center bg-amber-50 border border-amber-200 rounded-full text-xs font-bold text-amber-800';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'px-3 py-1.5'; b.textContent = (/casa/i.test(g.nombre) ? '🏠 ' : /trabajo/i.test(g.nombre) ? '💼 ' : '📍 ') + g.nombre;
+    b.onclick = () => { $('in-' + ultimoCampo).value = g.dir; fijarDir(ultimoCampo, g.dir, Number(g.lat), Number(g.lng)); };
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'pr-2.5 text-amber-500'; x.textContent = '×'; x.title = 'Borrar';
+    x.onclick = async () => { if (!confirm('¿Borrar «' + g.nombre + '»?')) return; await _sb.from('ne_direcciones').delete().eq('id', g.id); cargarGuardadas(); };
+    w.appendChild(b); w.appendChild(x); box.appendChild(w);
+  });
+  ['r', 'e'].forEach(k => { if (estD[k].t === 'ok') pintarZonaDir(k); });
+}
+async function guardarDir(k){
+  const c = D[k]; if (!c) return;
+  if (guardadas.length >= 8) return mostrarToast('Ya tenés 8 direcciones guardadas: borrá alguna con la ×');
+  const sug = guardadas.some(g => /casa/i.test(g.nombre)) ? (guardadas.some(g => /trabajo/i.test(g.nombre)) ? '' : 'Trabajo') : 'Casa';
+  const nombre = (prompt('¿Con qué nombre la guardamos? (ej: Casa, Trabajo, Local)', sug) || '').trim().slice(0, 30); if (!nombre) return;
+  const { error } = await _sb.from('ne_direcciones').insert({ user_id: sesion.user.id, nombre, dir: c.dir, lat: c.lat, lng: c.lng });
+  if (error) return mostrarToast('No se pudo guardar: ' + error.message);
+  mostrarToast('¡Guardada! 💚'); cargarGuardadas();
+}
+
+/* ============ FLUJO CLIENTE ============ */
+let paramsAplicados = false, comercioParam = '';
+async function irCliente(){
+  vista('cliente');
+  const pSes = asegurarSesion().then(() => true, () => false), pZon = zonas.length ? Promise.resolve() : cargarZonas();
+  const [okSes] = await Promise.all([pSes, pZon]);
+  if (!okSes) return;
+  ico();
+  tcAceptados = await aceptoTerminos('cliente'); $('tc-box').classList.toggle('hidden', tcAceptados);
+  cargarGuardadas();
+  $('c-nombre').value = $('c-nombre').value || localStorage.getItem('ne_nombre') || '';
+  $('c-wsp').value = $('c-wsp').value || localStorage.getItem('ne_wsp') || '';
+  if (!paramsAplicados) { paramsAplicados = true; aplicarParams(); }
+}
+function aplicarParams(){
+  const sp = new URLSearchParams(location.search);
+  const ret = (sp.get('retiro') || '').slice(0, 150), ent = (sp.get('entrega') || '').slice(0, 150);
+  comercioParam = (sp.get('comercio') || '').slice(0, 80);
+  if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
+  if (ret) { $('in-r').value = ret; ubicar('r'); }
+  if (ent) { $('in-e').value = ent; ubicar('e'); }
+}
+
+/* ============ BUSCAR REPARTIDORES (todos los disponibles + filtros) ============ */
+const F = { metodo:'todos', destino:false, adel:false, veh:'todos' };
+let ultimaLista = [], adelMonto = 0, busqRep = 0, adelT = null;
+function limpiarLista(){ ultimaLista = []; const b = $('res-box'); if (b) b.classList.add('hidden'); const l = $('lista-rep'); if (l) l.innerHTML = ''; }
+const chipCls = on => 'text-xs font-black rounded-xl py-2 px-2 ' + (on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600');
+function pintarFiltros(){
+  document.querySelectorAll('#f-met [data-v]').forEach(b => { b.className = 'flex-1 ' + chipCls(b.dataset.v === F.metodo); });
+  document.querySelectorAll('#f-veh [data-v]').forEach(b => { b.className = 'flex-1 ' + chipCls(b.dataset.v === F.veh); });
+  const t = (id, on, txt) => { const e = $(id); e.className = 'w-full text-left text-xs font-black rounded-xl px-3 py-2.5 border ' + (on ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-700 border-slate-200'); e.textContent = (on ? '✓ ' : '') + txt; };
+  t('f-destino', F.destino, '📦 Quiero pagar el envío al recibir (en destino)');
+  t('f-adel', F.adel, '🛒 Mi compra se paga en el comercio: que el repartidor la adelante');
+  $('f-adel-box').classList.toggle('hidden', !F.adel);
+}
+document.querySelectorAll('#f-met [data-v]').forEach(b => b.addEventListener('click', () => { F.metodo = b.dataset.v; pintarFiltros(); pintarRepartidores(); }));
+document.querySelectorAll('#f-veh [data-v]').forEach(b => b.addEventListener('click', () => { F.veh = b.dataset.v; pintarFiltros(); pintarRepartidores(); }));
+$('f-destino').addEventListener('click', () => { F.destino = !F.destino; pintarFiltros(); pintarRepartidores(); });
+$('f-adel').addEventListener('click', () => { F.adel = !F.adel; pintarFiltros(); buscarRepartidores(); if (F.adel) setTimeout(() => $('f-adel-monto').focus(), 50); });
+$('f-adel-monto').addEventListener('input', () => { clearTimeout(adelT); adelT = setTimeout(buscarRepartidores, 700); });
+$('tc-leer').addEventListener('click', () => mostrarLegal('terminos'));
+pintarFiltros();
+
+async function consultar(){
+  if (!zonas.length) return mostrarToast('No pudimos cargar las zonas. Recargá la página.');
+  const nombre = $('c-nombre').value.trim(), wsp = $('c-wsp').value.trim();
+  if ($('in-r').value.trim().length < 4) return mostrarToast('Escribí dónde retiramos');
+  if ($('in-e').value.trim().length < 4) return mostrarToast('Escribí dónde entregamos');
+  if (nombre.length < 2) return mostrarToast('Contanos tu nombre 🙂');
+  if (wsp.replace(/\D/g, '').length < 6) return mostrarToast('Dejanos tu WhatsApp para coordinar el envío');
+  if (!tcAceptados) {
+    if (!$('tc-ok').checked) return mostrarToast('Tenés que marcar «Estoy de acuerdo» con los términos para continuar');
+    const ac = await _sb.rpc('ne_aceptar_terminos', { p_tipo: 'cliente', p_version: TERMINOS_VERSION });
+    if (ac.error) return mostrarToast('No se pudo guardar la aceptación: ' + ac.error.message);
+    tcAceptados = true; $('tc-box').classList.add('hidden');
+  }
+  const btn = $('btn-consultar'); btn.disabled = true; $('err-sol').classList.add('hidden');
+  try {
+    // Si todavía no se ubicó alguna dirección, se ubica ahora y se espera
+    for (const k of ['r', 'e']) if (!D[k] && !pendD[k] && estD[k].t !== 'elegir') ubicar(k);
+    await Promise.all([pendD.r, pendD.e]);
+    if (!D.r) { btn.disabled = false; return mostrarToast('Elegí la zona del retiro'); }
+    if (!D.e) { btn.disabled = false; return mostrarToast('Elegí la zona de la entrega'); }
+    localStorage.setItem('ne_nombre', nombre); localStorage.setItem('ne_wsp', wsp);
+    await asegurarSesion();
+    await buscarRepartidores(true);
+  } catch (e) { mostrarToast('Error: ' + (e.message || e)); }
+  btn.disabled = false;
+}
+// Se consulta a la base por cada forma de pago posible y se une el resultado: así cada repartidor trae todo lo que acepta
+async function buscarRepartidores(primera){
+  if (!D.r || !D.e) return;
+  const mi = ++busqRep;
+  if (F.adel) {
+    const m = Math.round(parseFloat($('f-adel-monto').value));
+    if (!(m > 0 && m <= 1000000)) { adelMonto = 0; ultimaLista = []; $('res-box').classList.remove('hidden'); pintarRepartidores('Poné cuánto cuesta tu compra para ver quién puede pagarla por vos.'); return; }
+    adelMonto = m;
+  } else adelMonto = 0;
+  $('res-box').classList.remove('hidden'); $('rep-cant').textContent = ''; $('lista-rep').innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">Buscando repartidores…</div>';
+  if (primera) $('res-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const base = { r_lat: D.r.lat, r_lng: D.r.lng, e_lat: D.e.lat, e_lng: D.e.lng };
+  const combos = [['efectivo', 'retiro', 0], ['efectivo', 'entrega', 0], ['transferencia', 'retiro', 0], ['transferencia', 'entrega', 0], ['efectivo', 'retiro', adelMonto || 1], ['efectivo', 'entrega', adelMonto || 1]];
+  const res = await Promise.all(combos.map(([m, mo, ad]) => _sb.rpc('ne_listar_repartidores', { ...base, p_metodo: m, p_momento: mo, p_adelanto: ad }).then(r => r, e => ({ error: e }))));
+  if (mi !== busqRep) return;
+  if (res.every(r => r.error)) { $('lista-rep').innerHTML = ''; mostrarToast('Error: ' + (res[0].error.message || res[0].error)); return; }
+  const mp = new Map();
+  res.forEach((r, i) => (r.data || []).forEach(x => {
+    let o = mp.get(x.repartidor_id); if (!o) { o = { ...x, combos: new Set(), adelCombos: new Set(), adelanta: false }; mp.set(x.repartidor_id, o); }
+    if (i < 4) o.combos.add(combos[i][0] + '|' + combos[i][1]); else { o.adelanta = true; o.adelCombos.add(combos[i][0] + '|' + combos[i][1]); }
+  }));
+  mp.forEach(o => { if (!o.combos.size) o.combos = o.adelCombos; });
+  ultimaLista = [...mp.values()];
+  pintarRepartidores();
+}
+const metodosDe = r => ['efectivo', 'transferencia'].filter(m => [...r.combos].some(c => c.startsWith(m + '|')));
+const momentosDe = r => ['entrega', 'retiro'].filter(mo => [...r.combos].some(c => c.endsWith('|' + mo)));
+function pasaFiltro(r){
+  if (F.veh !== 'todos' && r.vehiculo !== F.veh) return false;
+  const ms = F.metodo === 'todos' ? ['efectivo', 'transferencia'] : [F.metodo], mo = F.destino ? ['entrega'] : ['retiro', 'entrega'];
+  if (!ms.some(m => mo.some(x => r.combos.has(m + '|' + x)))) return false;
+  if (F.adel && !r.adelanta) return false;
+  return true;
+}
+function pintarRepartidores(msg){
+  const box = $('lista-rep'); box.innerHTML = '';
+  if (msg) { $('rep-cant').textContent = ''; box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + esc(msg) + '</div>'; return; }
+  const lista = ultimaLista.filter(pasaFiltro).sort((a, b) => Number(a.precio) - Number(b.precio));
+  $('rep-cant').textContent = lista.length ? (lista.length === 1 ? '1 repartidor disponible' : lista.length + ' repartidores disponibles') + ' · ordenados por precio' : '';
+  if (!lista.length) {
+    box.innerHTML = '<div class="clean-card rounded-3xl p-5 text-center text-sm text-slate-500">' + (ultimaLista.length ? 'Ninguno cumple con todo lo que pediste 😕 Probá sacar algún filtro.' : 'Ahora no hay repartidores libres para ese recorrido 😕 Probá en unos minutos.') + '</div>'; return;
+  }
+  lista.forEach(r => {
+    const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
+    const ms = metodosDe(r), mos = momentosDe(r);
+    const pill = t => '<span class="inline-block text-[10px] font-black bg-brand-50 text-brand-700 border border-brand-200 rounded-full px-2 py-0.5">' + t + '</span>';
+    const pills = [ms.includes('efectivo') ? pill('💵 Efectivo') : '', ms.includes('transferencia') ? pill('🏦 Transferencia') : '',
+      pill(mos.length > 1 ? 'Cobra en retiro o entrega' : mos[0] === 'retiro' ? 'Cobra en el retiro' : 'Cobra al entregar'),
+      r.adelanta ? pill(F.adel ? '🛒 Te adelanta ' + money(adelMonto) : '🛒 Puede pagar tu compra') : ''].join(' ');
+    const d = document.createElement('div'); d.className = 'clean-card rounded-3xl p-4 space-y-2';
+    d.innerHTML = `<div class="flex items-center gap-3"><img src="${esc(foto)}" alt="" class="w-14 h-14 rounded-2xl object-cover bg-slate-100 border border-brand-200 flex-shrink-0">
+      <div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p>${r.comparte_ubicacion ? '<p class="text-[10px] font-black text-brand-700">📍 Seguimiento en vivo</p>' : ''}
+      <p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo] || r.vehiculo)} · ⭐ ${r.cant_calif ? Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ')' : 'Nuevo'}</p></div>
+      <div class="text-right"><p class="font-black text-lg text-brand-600">${money(r.precio)}</p>
+      <button type="button" class="mt-1 bg-brand-600 text-white text-xs font-black px-3 py-1.5 rounded-xl active:scale-95">Pedir</button></div></div>
+      <div class="flex flex-wrap gap-1">${pills}</div>`;
+    d.querySelector('button').onclick = () => abrirConf(r);
+    box.appendChild(d);
+  });
+}
+function mostrarError(m){ const e = $('err-sol'); e.textContent = m; e.classList.remove('hidden'); e.scrollIntoView({ behavior:'smooth', block:'center' }); mostrarToast(m); }
+
+/* ---- Confirmación: solo pregunta lo que el repartidor permite elegir ---- */
+let conf = null;
+function abrirConf(r){
+  const ms = metodosDe(r);
+  const metodo = (F.metodo !== 'todos' && ms.includes(F.metodo)) ? F.metodo : ms[0];
+  conf = { r, ms, metodo, momento: null }; ajustarMomento(); pintarConf(); abrirModal('modal-conf');
+}
+const momentosConf = () => ['entrega', 'retiro'].filter(mo => conf.r.combos.has(conf.metodo + '|' + mo));
+function ajustarMomento(){ const mos = momentosConf(); conf.momento = (conf.momento && mos.includes(conf.momento)) ? conf.momento : ((F.destino && mos.includes('entrega')) ? 'entrega' : mos[0]); }
+function pintarConf(){
+  const r = conf.r, mos = momentosConf(), adel = (F.adel && r.adelanta) ? adelMonto : 0;
+  const foto = r.rostro_path ? `${SUPABASE_URL}/storage/v1/object/public/ne-rostros/${encodeURI(r.rostro_path)}` : '';
+  const grupo = (titulo, ops, sel, attr) => '<div><p class="text-[11px] font-extrabold text-slate-500 uppercase mb-1">' + titulo + '</p><div class="flex gap-1.5">' +
+    ops.map(([v, t]) => '<button type="button" ' + attr + '="' + v + '" class="flex-1 ' + chipCls(v === sel) + '">' + t + '</button>').join('') + '</div></div>';
+  let h = `<div class="flex items-center gap-3 bg-brand-50 rounded-2xl p-3"><img src="${esc(foto)}" alt="" class="w-12 h-12 rounded-xl object-cover bg-slate-100 border border-brand-200"><div class="flex-1 min-w-0"><p class="font-black text-sm text-slate-900 truncate">${esc(r.nombre)}</p><p class="text-[11px] text-slate-500">${esc(VEH[r.vehiculo] || r.vehiculo)}</p></div><p class="font-black text-xl text-brand-600">${money(r.precio)}</p></div>
+    <div class="text-[11px] text-slate-600 space-y-0.5"><p>📍 <b>Retiro:</b> ${esc(dirFinal('r'))} · ${esc(D.r.zona)}</p><p>🏁 <b>Entrega:</b> ${esc(dirFinal('e'))} · ${esc(D.e.zona)}</p></div>`;
+  if (conf.ms.length > 1) h += grupo('¿Cómo le pagás el envío?', conf.ms.map(m => [m, m === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia']), conf.metodo, 'data-m');
+  if (mos.length > 1) h += grupo('¿Cuándo le pagás?', mos.map(m => [m, m === 'retiro' ? 'En el retiro' : 'Al recibir']), conf.momento, 'data-mo');
+  h += '<div class="bg-amber-50 rounded-2xl p-3 space-y-1">' + resumenPago({ precio: r.precio, pago_envio_metodo: conf.metodo, pago_envio_momento: conf.momento, adelanto_monto: adel }, true) + '</div>';
+  $('conf-cont').innerHTML = h;
+  document.querySelectorAll('#conf-cont [data-m]').forEach(b => b.onclick = () => { conf.metodo = b.dataset.m; ajustarMomento(); pintarConf(); });
+  document.querySelectorAll('#conf-cont [data-mo]').forEach(b => b.onclick = () => { conf.momento = b.dataset.mo; pintarConf(); });
+}
+$('conf-ok').addEventListener('click', async () => {
+  if (!conf) return; const btn = $('conf-ok'), txt = btn.textContent; btn.disabled = true; btn.textContent = 'Pidiendo…'; $('err-sol').classList.add('hidden');
+  const r = conf.r; let id = null;
+  try {
+    const { data, error } = await _sb.rpc('ne_crear_pedido', {
+      p_rep: r.repartidor_id, p_nombre: $('c-nombre').value.trim(), p_whatsapp: $('c-wsp').value.trim(), p_comercio: comercioParam,
+      r_dir: dirFinal('r'), r_lat: D.r.lat, r_lng: D.r.lng, e_dir: dirFinal('e'), e_lat: D.e.lat, e_lng: D.e.lng,
+      p_metodo: conf.metodo, p_momento: conf.momento, p_adelanto: (F.adel && r.adelanta) ? adelMonto : 0 });
+    if (error) throw error; id = data;
+  } catch (e) {
+    let m = (e && e.message) || 'No se pudo solicitar el envío';
+    if (/3 pedidos/.test(m)) m += '. Cancelá los viejos desde el ícono del reloj (Mis pedidos).';
+    cerrarModal('modal-conf'); mostrarError(m); btn.disabled = false; btn.textContent = txt;
+    if (/ya no está disponible/.test(m)) buscarRepartidores();
+    return;
+  }
+  btn.disabled = false; btn.textContent = txt; cerrarModal('modal-conf');
+  try { limpiarLista(); await abrirChat(id); }
+  catch (e) { mostrarError('Tu pedido se creó, pero no pudimos abrir el chat. Mirá el ícono del reloj (Mis pedidos). Detalle: ' + ((e && e.message) || e)); }
+});
 
 /* ============ CHAT DEL PEDIDO ============ */
 let chatId = null, chatCanal = null, chatPoll = null, chatPedido = null, ultimoMsg = 0, chatRep = null, mapaChat = null, capaChat = null;
@@ -765,17 +817,13 @@ $('ch-input').addEventListener('keydown', e => { if (e.key === 'Enter') enviarMs
 /* ============ MIS PEDIDOS ============ */
 async function repetirPedido(p){
   cerrarModal('modal-pedidos'); await irCliente();
-  pagoMetodo = p.pago_envio_metodo === 'transferencia' ? 'transferencia' : 'efectivo';
-  pagoMomento = p.pago_envio_momento === 'retiro' ? 'retiro' : 'entrega';
-  pagoAdelanto = Number(p.adelanto_monto) > 0; adelConsultado = 0;
-  $('adel-box').classList.toggle('hidden', !pagoAdelanto); if (pagoAdelanto) $('adel-monto').value = Math.round(Number(p.adelanto_monto));
-  chipsRepintar.forEach(f => f()); limpiarLista();
   comercioParam = p.comercio || '';
-  ponerPunto('r', p.retiro_lat, p.retiro_lng, p.retiro_dir, false, true);
-  ponerPunto('e', p.entrega_lat, p.entrega_lng, p.entrega_dir, false, true);
-  setActivo('r');
-  try { mapa.fitBounds([[p.retiro_lat, p.retiro_lng], [p.entrega_lat, p.entrega_lng]], { padding: [40, 40], maxZoom: 16 }); } catch (e) {}
-  mostrarToast('Listo, cargamos tu pedido anterior 💚 Ahora elegí repartidor.');
+  [['r', p.retiro_dir, p.retiro_lat, p.retiro_lng], ['e', p.entrega_dir, p.entrega_lat, p.entrega_lng]].forEach(([k, dir, la, lo]) => {
+    const limpia = String(dir || '').replace(SUF_APROX, '');
+    $('in-' + k).value = limpia; fijarDir(k, limpia, Number(la), Number(lo));
+  });
+  limpiarLista();
+  mostrarToast('Listo, cargamos tu pedido anterior 💚 Ahora tocá «Ver repartidores disponibles».');
 }
 async function abrirMisPedidos(){
   abrirModal('modal-pedidos'); const box = $('lista-pedidos'); box.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
