@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://itpkfuprqihmclsqjfki.supabase.co" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link rel="preconnect" href="https://apis.datos.gob.ar" crossorigin>
+<link rel="preconnect" href="https://photon.komoot.io" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -320,6 +321,21 @@ function urlBusqueda(q, limite){
   const qq = /necochea|quequ/i.test(q) ? q : q + ', Necochea';
   return `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=${limite}&countrycodes=ar&viewbox=-58.85,-38.50,-58.62,-38.62&bounded=1&accept-language=es&q=${encodeURIComponent(qq)}`;
 }
+// Photon (buscador de direcciones de Komoot, con datos de OpenStreetMap). Acepta errores de tipeo y escritura a medias.
+async function photon(q, limite){
+  try {
+    const qq = /necochea|quequ/i.test(q) ? q : q + ', Necochea';
+    const url = 'https://photon.komoot.io/api/?limit=' + limite + '&lat=-38.56&lon=-58.74&bbox=-58.85,-38.62,-58.62,-38.50&q=' + encodeURIComponent(qq);
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(url, { signal: ctl.signal }); clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.features || []).filter(f => f.geometry && f.geometry.coordinates).map(f => {
+      const pr = f.properties || {}, calle = pr.street || pr.name || '';
+      return { lat: +f.geometry.coordinates[1], lng: +f.geometry.coordinates[0], texto: calle + (pr.housenumber ? ' ' + pr.housenumber : '') + (pr.district ? ', ' + pr.district : '') };
+    });
+  } catch (e) { return null; }
+}
 function tituloCalle(c){
   const n = String((c && c.nombre) || '').trim();
   if (/^\d+$/.test(n)) return 'Calle ' + n;
@@ -344,8 +360,10 @@ async function georef(q, limite){
 async function buscarFuente(q, limite){
   const g = await georef(q, limite);
   if (g && g.length) return g;
+  const ph = await photon(q, limite);
+  if (ph && ph.length) return ph;
   const j = await nom(urlBusqueda(q, limite));
-  if (j === null && g === null) return null;      // fallaron las dos fuentes
+  if (j === null && g === null && ph === null) return null;      // fallaron todas las fuentes
   return (j || []).map(it => ({ lat: +it.lat, lng: +it.lon, texto: formatDir(it) }));
 }
 function dist(a, b){ const R = 6371000, rad = x => x * Math.PI / 180, dLa = rad(b.lat - a.lat), dLo = rad(b.lng - a.lng);
@@ -357,12 +375,16 @@ function parseDir(q){
   const pref = m[1] ? (/^d/i.test(m[1]) ? 'Diagonal ' : 'Av. ') : 'Calle ';
   return { calle: m[2], bis: !!m[3], altura: m[4] || '', texto: pref + m[2] + (m[3] ? ' bis' : '') + (m[4] ? ' ' + m[4] : '') };
 }
-// Consulta dos fuentes distintas (Georef y OpenStreetMap) a la vez
+// Consulta dos fuentes distintas (Georef y Photon) a la vez
 async function buscarNumerica(p){
   const bis = p.bis ? ' bis' : '';
   const qs = [`calle ${p.calle}${bis} ${p.altura}`, `${p.calle}${bis} ${p.altura}`];
   const getA = async () => { for (const q of qs) { const g = await georef(q, 1); if (g && g.length) return g[0]; } return null; };
-  const getB = async () => { for (const q of qs) { const j = await nom(urlBusqueda(q, 1)); if (j && j.length) return { lat: +j[0].lat, lng: +j[0].lon }; } return null; };
+  const getB = async () => {
+    for (const q of qs) { const j = await photon(q, 1); if (j && j.length) return { lat: j[0].lat, lng: j[0].lng }; }
+    for (const q of qs) { const j = await nom(urlBusqueda(q, 1)); if (j && j.length) return { lat: +j[0].lat, lng: +j[0].lon }; }
+    return null;
+  };
   const [A, B] = await Promise.all([getA(), getB()]);
   return { A, B };
 }
@@ -650,7 +672,7 @@ function pintarConf(){
     fila('⭐', r.cant_calif ? 'Calificación ' + Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ' opiniones)' : 'Repartidor nuevo, todavía sin opiniones') +
     fila('💵', 'Acepta: ' + ms0.map(m => m === 'efectivo' ? 'efectivo' : 'transferencia').join(' y ')) +
     fila('📦', mos0.length > 1 ? 'Cobra en el retiro o al entregar' : mos0[0] === 'retiro' ? 'Cobra en el retiro' : 'Cobra al entregar') +
-    (r.adelanta ? fila('🛒', 'Puede pagar tu compra en el comercio') : fila('🚫', 'No adelanta dinero: si tu compra se paga en el destino, no te sirve', true)) +
+    (r.adelanta ? fila('🛒', 'Puede pagar tu compra en el comercio') : fila('🚫', 'No adelanta dinero: si tu compra se paga en el comercio, no te sirve', true)) +
     (r.comparte_ubicacion ? fila('📍', 'Seguimiento en vivo') : '') + '</div>';
   if (conf.ms.length > 1) h += grupo('¿Cómo le pagás el envío?', conf.ms.map(m => [m, m === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia']), conf.metodo, 'data-m');
   if (mos.length > 1) h += grupo('¿Cuándo le pagás?', mos.map(m => [m, m === 'retiro' ? 'En el retiro' : 'Al recibir']), conf.momento, 'data-mo');
