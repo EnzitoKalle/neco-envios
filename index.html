@@ -650,7 +650,7 @@ function pintarConf(){
     fila('⭐', r.cant_calif ? 'Calificación ' + Number(r.calificacion).toFixed(1) + ' (' + Number(r.cant_calif) + ' opiniones)' : 'Repartidor nuevo, todavía sin opiniones') +
     fila('💵', 'Acepta: ' + ms0.map(m => m === 'efectivo' ? 'efectivo' : 'transferencia').join(' y ')) +
     fila('📦', mos0.length > 1 ? 'Cobra en el retiro o al entregar' : mos0[0] === 'retiro' ? 'Cobra en el retiro' : 'Cobra al entregar') +
-    (r.adelanta ? fila('🛒', 'Puede pagar tu compra en el comercio') : fila('🚫', 'No adelanta dinero: si tu compra se paga en el comercio, no te sirve', true)) +
+    (r.adelanta ? fila('🛒', 'Puede pagar tu compra en el comercio') : fila('🚫', 'No adelanta dinero: si tu compra se paga en el destino, no te sirve', true)) +
     (r.comparte_ubicacion ? fila('📍', 'Seguimiento en vivo') : '') + '</div>';
   if (conf.ms.length > 1) h += grupo('¿Cómo le pagás el envío?', conf.ms.map(m => [m, m === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia']), conf.metodo, 'data-m');
   if (mos.length > 1) h += grupo('¿Cuándo le pagás?', mos.map(m => [m, m === 'retiro' ? 'En el retiro' : 'Al recibir']), conf.momento, 'data-mo');
