@@ -553,6 +553,9 @@ function aplicarParams(){
   const ret = (sp.get('retiro') || '').slice(0, 150), ent = (sp.get('entrega') || '').slice(0, 150);
   comercioParam = (sp.get('comercio') || '').slice(0, 80);
   if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
+  const nom = (sp.get('nombre') || '').slice(0, 60), wa = (sp.get('whatsapp') || '').replace(/[^\d+]/g, '').slice(0, 20);
+  if (nom) $('c-nombre').value = nom;
+  if (wa) $('c-wsp').value = wa;
   if (ret) { $('in-r').value = ret; ubicar('r'); }
   if (ent) { $('in-e').value = ent; ubicar('e'); }
 }
