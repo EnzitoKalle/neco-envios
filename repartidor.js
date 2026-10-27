@@ -102,8 +102,6 @@
         <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo cobrás el envío?</label>
           <select id="g-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="entrega">Al entregar (en destino)</option><option value="retiro">Al retirar</option><option value="ambos">Cualquiera (elige el cliente)</option></select></div>
         <label class="flex items-start gap-2 text-sm font-bold"><input id="g-ad" type="checkbox" class="w-5 h-5 mt-0.5"> <span>Manejo efectivo: puedo pagar el pedido en el comercio y cobrárselo al cliente al entregar</span></label>
-        <div id="g-ad-box" class="hidden"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto máximo que puedo adelantar ($)</label>
-          <input id="g-max" type="number" min="1" inputmode="numeric" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 20000"></div>
       </div>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Foto del DNI (frente)</label>
         <input id="g-dni" type="file" accept="image/*" class="block w-full text-xs mt-1"><p id="g-dni-ok" class="text-[11px] text-brand-600 font-bold"></p></div>
@@ -130,7 +128,6 @@
       cerrarCamara(); v.classList.add('hidden'); $('g-cap').classList.add('hidden');
     };
     $('g-tr').onchange = e => $('g-alias-box').classList.toggle('hidden', !e.target.checked);
-    $('g-ad').onchange = e => $('g-ad-box').classList.toggle('hidden', !e.target.checked);
     $('g-leer').onclick = () => mostrarLegal('terminos_rep');
     $('g-send').onclick = enviarRegistro;
   }
@@ -141,11 +138,10 @@
     if (doc.length < 6) return mostrarToast('Revisá el número de documento');
     if (!R.dni) return mostrarToast('Falta la foto del DNI');
     if (!R.rostro) return mostrarToast('Falta la foto de rostro con la cámara');
-    const ef = $('g-ef').checked, tr = $('g-tr').checked, ad = $('g-ad').checked, alias = $('g-alias').value.trim(), mx = Math.round(parseFloat($('g-max').value) || 0);
+    const ef = $('g-ef').checked, tr = $('g-tr').checked, ad = $('g-ad').checked, alias = $('g-alias').value.trim();
     if (!ef && !tr) return mostrarToast('Elegí cómo cobrás: efectivo, transferencia o las dos');
     if (tr && alias.length < 3) return mostrarToast('Poné tu alias o CBU para recibir transferencias');
-    if (ad && !(mx > 0 && mx <= 1000000)) return mostrarToast('Poné el monto máximo que podés adelantar');
-    const cobros = { acepta_efectivo: ef, acepta_transferencia: tr, alias_pago: tr ? alias : null, momento_cobro: $('g-mom').value, adelanta_pagos: ad, max_adelanto: ad ? mx : 0 };
+    const cobros = { acepta_efectivo: ef, acepta_transferencia: tr, alias_pago: tr ? alias : null, momento_cobro: $('g-mom').value, adelanta_pagos: ad, max_adelanto: ad ? 1000000 : 0 };
     const b = $('g-send'); b.disabled = true; b.textContent = 'Enviando...';
     try {
       const ses = (await _sb.auth.getSession()).data.session;
@@ -424,17 +420,13 @@
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo cobrás el envío?</label>
         <select id="c-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="entrega" ${sel('entrega')}>En la entrega</option><option value="retiro" ${sel('retiro')}>En el retiro</option><option value="ambos" ${sel('ambos')}>Cualquiera (elige el cliente)</option></select></div>
       <label class="flex items-start gap-2 text-sm font-bold"><input id="c-ad" type="checkbox" class="w-5 h-5 mt-0.5" ${ad ? 'checked' : ''}> <span>Manejo efectivo: puedo pagar el pedido en el comercio y cobrárselo al cliente en la entrega</span></label>
-      <div id="c-ad-box" class="${ad ? '' : 'hidden'}"><label class="text-[11px] font-extrabold text-slate-500 uppercase">Monto máximo que puedo adelantar ($)</label>
-        <input id="c-max" type="number" min="1" inputmode="numeric" value="${Number(p.max_adelanto || '') || ''}" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Ej: 20000"></div>
       ${btn('c-save', 'Guardar cobros')}`);
     $('c-tr').onchange = e => $('c-alias-box').classList.toggle('hidden', !e.target.checked);
-    $('c-ad').onchange = e => $('c-ad-box').classList.toggle('hidden', !e.target.checked);
     $('c-save').onclick = async () => {
-      const ef2 = $('c-ef').checked, tr2 = $('c-tr').checked, ad2 = $('c-ad').checked, alias = $('c-alias').value.trim(), mx = Math.round(parseFloat($('c-max').value) || 0);
+      const ef2 = $('c-ef').checked, tr2 = $('c-tr').checked, ad2 = $('c-ad').checked, alias = $('c-alias').value.trim();
       if (!ef2 && !tr2) return mostrarToast('Aceptá al menos efectivo o transferencia');
       if (tr2 && alias.length < 3) return mostrarToast('Poné tu alias o CBU para recibir transferencias');
-      if (ad2 && !(mx > 0 && mx <= 1000000)) return mostrarToast('Poné el monto máximo que podés adelantar');
-      const cambios = { acepta_efectivo: ef2, acepta_transferencia: tr2, alias_pago: tr2 ? alias : null, momento_cobro: $('c-mom').value, adelanta_pagos: ad2, max_adelanto: ad2 ? mx : 0 };
+      const cambios = { acepta_efectivo: ef2, acepta_transferencia: tr2, alias_pago: tr2 ? alias : null, momento_cobro: $('c-mom').value, adelanta_pagos: ad2, max_adelanto: ad2 ? 1000000 : 0 };
       const { error } = await _sb.from('ne_repartidores').update(cambios).eq('user_id', sesion.user.id);
       if (error) return mostrarToast('Error: ' + error.message);
       Object.assign(R.perfil, cambios); mostrarToast('Cobros guardados');
