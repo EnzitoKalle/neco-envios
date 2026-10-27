@@ -228,6 +228,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
 const SUPABASE_URL = "https://itpkfuprqihmclsqjfki.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sW8WBd-hoa155VOla5xj8A__0X494yO"; // clave pública (segura de exponer, la protege el RLS)
 const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TEL_AYUDA = "542262541305"; // WhatsApp de ayuda (con código de país, sin + ni espacios)
 const EMAIL_ADMIN = "enzitohkallepremium@gmail.com"; // solo para mostrar el botón; la seguridad real está en la base
 
 /* ============ UTILIDADES ============ */
@@ -790,6 +791,12 @@ async function refrescarPedido(){
     b.className = 'w-full bg-rose-50 border border-rose-200 text-rose-600 text-xs font-black rounded-xl py-2.5 active:scale-95'; b.textContent = 'Cancelar pedido';
     b.onclick = async () => { if (!confirm('¿Cancelar el pedido?')) return; const { error } = await _sb.rpc('ne_cancelar', { p_pedido: chatId }); if (error) mostrarToast(error.message); else refrescarPedido(); };
     ac.appendChild(b);
+  }
+  if (esCli && ABIERTOS.includes(data.estado)) {
+    const msg = 'Necesito ayuda con mi envío #' + String(data.id).slice(0, 8) + '\n📍 ' + fixDir(data.retiro_dir) + ' → 🏁 ' + fixDir(data.entrega_dir);
+    const h = document.createElement('a'); h.href = 'https://wa.me/' + TEL_AYUDA + '?text=' + encodeURIComponent(msg); h.target = '_blank'; h.rel = 'noopener';
+    h.className = 'block w-full text-center bg-amber-50 border border-amber-300 text-amber-800 text-xs font-black rounded-xl py-2.5 active:scale-95'; h.textContent = '🆘 Necesito ayuda';
+    ac.appendChild(h);
   }
   if (esCli && data.estado === 'entregado' && !data.calificacion) {
     const w = document.createElement('div'); w.className = 'text-center';

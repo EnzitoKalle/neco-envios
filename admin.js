@@ -150,8 +150,15 @@
     const nom = {}; A.reps.forEach(r => nom[r.user_id] = r.nombre);
     const { data, error } = await _sb.from('ne_pedidos').select('*').order('creado', { ascending: false }).limit(150);
     if (error) { $('ad-cont').textContent = error.message; return; }
-    let h = `<div class="overflow-x-auto"><table class="w-full"><thead><tr><th class="${th}">Fecha</th><th class="${th}">Estado</th><th class="${th}">Repartidor</th><th class="${th}">Recorrido</th><th class="${th}">Precio</th><th class="${th}">Pago</th></tr></thead><tbody>`;
-    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</td><td class="${td} font-black">${money(p.precio)}</td><td class="${td}">${esc(p.pago_envio_metodo || "efectivo")} · ${p.pago_envio_momento === "retiro" ? "retiro" : "entrega"}${Number(p.adelanto_monto) > 0 ? " · adelanto " + money(p.adelanto_monto) : ""}</td></tr>`);
+    let h = `<div class="overflow-x-auto"><table class="w-full"><thead><tr><th class="${th}">Fecha</th><th class="${th}">Estado</th><th class="${th}">Repartidor</th><th class="${th}">Recorrido</th><th class="${th}">Precio</th><th class="${th}">Pago</th><th class="${th}">N°</th><th class="${th}"></th></tr></thead><tbody>`;
+    (data || []).forEach(p => h += `<tr><td class="${td}">${esc(new Date(p.creado).toLocaleString('es-AR'))}</td><td class="${td} font-bold">${esc(ESTADOS[p.estado] || p.estado)}</td><td class="${td}">${esc(nom[p.repartidor_id] || '—')}</td><td class="${td}">${esc(fixDir(p.retiro_dir))} → ${esc(fixDir(p.entrega_dir))}</td><td class="${td} font-black">${money(p.precio)}</td><td class="${td}">${esc(p.pago_envio_metodo || "efectivo")} · ${p.pago_envio_momento === "retiro" ? "retiro" : "entrega"}${Number(p.adelanto_monto) > 0 ? " · adelanto " + money(p.adelanto_monto) : ""}</td><td class="${td} font-mono">${esc(String(p.id).slice(0, 8))}</td><td class="${td}">${['solicitado', 'aceptado', 'en_camino_retiro', 'retirado'].includes(p.estado) ? bt('Cancelar', 'bg-rose-50 border border-rose-200 text-rose-600', 'data-cancel="' + esc(p.id) + '"') : ''}</td></tr>`);
     $('ad-cont').innerHTML = h + '</tbody></table></div>';
+    $('ad-cont').querySelectorAll('[data-cancel]').forEach(x => x.onclick = async () => {
+      if (!confirm('¿Cancelar este envío? Se le avisa al cliente y al repartidor.')) return;
+      x.disabled = true;
+      const { error } = await _sb.rpc('ne_admin_cancelar', { p_pedido: x.dataset.cancel });
+      if (error) { x.disabled = false; return mostrarToast('No se pudo cancelar: ' + error.message); }
+      mostrarToast('Envío cancelado'); tPedidos();
+    });
   }
 })();
