@@ -172,10 +172,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
 
 <!-- MODAL: CHAT / PEDIDO -->
 <div id="modal-chat" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-  <div class="clean-modal rounded-3xl p-5 w-full max-w-md flex flex-col gap-3 max-h-[90vh] text-slate-800">
+  <div class="clean-modal rounded-3xl p-5 w-full max-w-md flex flex-col gap-3 max-h-[90vh] overflow-y-auto text-slate-800">
     <div class="flex justify-between items-start">
       <div class="min-w-0"><h3 class="text-base font-black text-slate-900">Tu pedido</h3><span id="ch-estado" class="inline-block mt-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-brand-100 text-brand-700"></span></div>
-      <button onclick="cerrarChat()" type="button" class="p-1 rounded-full text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        <a id="ch-ayuda" href="#" target="_blank" rel="noopener" class="hidden bg-amber-50 border border-amber-300 text-amber-800 text-xs font-black rounded-xl px-3 py-1.5 active:scale-95">🆘 Necesito ayuda</a>
+        <button onclick="cerrarChat()" type="button" class="p-1 rounded-full text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
     </div>
     <div id="ch-rep" class="hidden flex items-center gap-3 bg-brand-50 rounded-2xl p-2.5"></div>
     <div id="ch-pasos" class="hidden"></div>
@@ -553,9 +556,6 @@ function aplicarParams(){
   const ret = (sp.get('retiro') || '').slice(0, 150), ent = (sp.get('entrega') || '').slice(0, 150);
   comercioParam = (sp.get('comercio') || '').slice(0, 80);
   if (comercioParam) { $('aviso-comercio').textContent = 'Pedido desde: ' + comercioParam; $('aviso-comercio').classList.remove('hidden'); }
-  const nom = (sp.get('nombre') || '').slice(0, 60), wa = (sp.get('whatsapp') || '').replace(/[^\d+]/g, '').slice(0, 20);
-  if (nom) $('c-nombre').value = nom;
-  if (wa) $('c-wsp').value = wa;
   if (ret) { $('in-r').value = ret; ubicar('r'); }
   if (ent) { $('in-e').value = ent; ubicar('e'); }
 }
@@ -760,7 +760,7 @@ function celebrar(){
   document.body.appendChild(box); setTimeout(() => { try { box.remove(); } catch (e) {} }, 3600);
 }
 async function abrirChat(id){
-  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-rep').classList.add('hidden'); $('ch-mapa-box').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
+  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-ayuda').classList.add('hidden'); $('ch-rep').classList.add('hidden'); $('ch-mapa-box').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
   await refrescarPedido(); await cargarMensajes();
   if (chatCanal) _sb.removeChannel(chatCanal);
   chatCanal = _sb.channel('ped-' + id)
@@ -795,12 +795,11 @@ async function refrescarPedido(){
     b.onclick = async () => { if (!confirm('¿Cancelar el pedido?')) return; const { error } = await _sb.rpc('ne_cancelar', { p_pedido: chatId }); if (error) mostrarToast(error.message); else refrescarPedido(); };
     ac.appendChild(b);
   }
+  const ay = $('ch-ayuda');
   if (esCli && ABIERTOS.includes(data.estado)) {
     const msg = 'Necesito ayuda con mi envío #' + String(data.id).slice(0, 8) + '\n📍 ' + fixDir(data.retiro_dir) + ' → 🏁 ' + fixDir(data.entrega_dir);
-    const h = document.createElement('a'); h.href = 'https://wa.me/' + TEL_AYUDA + '?text=' + encodeURIComponent(msg); h.target = '_blank'; h.rel = 'noopener';
-    h.className = 'block w-full text-center bg-amber-50 border border-amber-300 text-amber-800 text-xs font-black rounded-xl py-2.5 active:scale-95'; h.textContent = '🆘 Necesito ayuda';
-    ac.appendChild(h);
-  }
+    ay.href = 'https://wa.me/' + TEL_AYUDA + '?text=' + encodeURIComponent(msg); ay.classList.remove('hidden');
+  } else ay.classList.add('hidden');
   if (esCli && data.estado === 'entregado' && !data.calificacion) {
     const w = document.createElement('div'); w.className = 'text-center';
     w.innerHTML = '<p class="text-sm font-black text-slate-800">¡Gracias por usar NecoEnvíos! 💚</p><p class="text-xs font-bold text-slate-600 mb-1">¿Cómo estuvo tu envío?</p>';
