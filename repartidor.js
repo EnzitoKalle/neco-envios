@@ -259,7 +259,7 @@
     L.forEach(o => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-3xl space-y-2 ' + (o.estado === 'solicitado' ? 'p-5 border-4 border-amber-400' : 'p-4');
       d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="${o.estado === 'solicitado' ? 'text-3xl' : 'text-lg'} text-brand-600">${money(o.precio)}</b></div>
-        <p class="text-xs text-slate-600">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-xs text-slate-600">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}${navFila(o)}
+        <p class="text-base font-black text-slate-800">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p><p class="text-base font-black text-slate-800">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}${navFila(o)}
         ${o.comercio ? `<p class="text-[11px] text-slate-400">Comercio: ${esc(o.comercio)}</p>` : ''}<p class="text-[11px] text-slate-400">Cliente: ${esc(o.cliente_nombre)}</p>
         <div class="flex flex-wrap gap-2 pt-1" data-acc></div>`;
       const acc = d.querySelector('[data-acc]');
@@ -278,17 +278,23 @@
 
   /* --- Mapa del recorrido y botón «¿Cómo llegar?» (abre el GPS del celular) --- */
   const peds = {};
-  function urlNav(lat, lng, app) {
-    const la = Number(lat), lo = Number(lng); if (!isFinite(la) || !isFinite(lo)) return '#';
-    if (app === 'waze') return 'https://waze.com/ul?ll=' + la + ',' + lo + '&navigate=yes';
-    const modo = { moto: 'two-wheeler', bici: 'bicycling', auto: 'driving' }[R.perfil && R.perfil.vehiculo] || 'driving';
-    return 'https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=' + modo;
+  const AVISO_PIN = '⚠️ El pin del mapa es aproximado y puede fallar. Guiate por la dirección escrita y confirmá con el cliente por el chat.';
+  // «Cómo llegar» busca por la DIRECCIÓN ESCRITA (el pin puede estar mal). El pin queda como opción aparte.
+  function textoDir(dir) {
+    const t = String(fixDir(dir || '')).replace(SUF_APROX, '').trim(), m = t.match(/\d+/);
+    return t + ', ' + (m && +m[0] >= 500 ? 'Quequén, ' : '') + 'Necochea, Buenos Aires, Argentina';
   }
-  function destinoDe(o) { return o.estado === 'retirado' ? { lat: o.entrega_lat, lng: o.entrega_lng, txt: 'a la entrega' } : { lat: o.retiro_lat, lng: o.retiro_lng, txt: 'al retiro' }; }
+  function modoViaje() { return { moto: 'two-wheeler', bici: 'bicycling', auto: 'driving' }[R.perfil && R.perfil.vehiculo] || 'driving'; }
+  function urlDir(dir, app) {
+    const q = encodeURIComponent(textoDir(dir));
+    if (app === 'waze') return 'https://waze.com/ul?q=' + q + '&navigate=yes';
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + q + '&travelmode=' + modoViaje();
+  }
+  function destinoDe(o) { return o.estado === 'retirado' ? { dir: o.entrega_dir, lat: o.entrega_lat, lng: o.entrega_lng, txt: 'a la entrega' } : { dir: o.retiro_dir, lat: o.retiro_lat, lng: o.retiro_lng, txt: 'al retiro' }; }
   function navLinks(o) {
     const d = destinoDe(o), cls = 'flex-1 text-center text-xs font-black rounded-xl py-2.5 active:scale-95 ';
-    return '<a href="' + esc(urlNav(d.lat, d.lng, 'google')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>' +
-           '<a href="' + esc(urlNav(d.lat, d.lng, 'waze')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-sky-50 border border-sky-200 text-sky-700">Waze</a>';
+    return '<a href="' + esc(urlDir(d.dir, 'google')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>' +
+           '<a href="' + esc(urlDir(d.dir, 'waze')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-sky-50 border border-sky-200 text-sky-700">Waze</a>';
   }
   function navFila(o) {
     peds[o.id] = o;
@@ -305,7 +311,7 @@
       m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[75]';
       m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3"><div class="flex justify-between items-start"><div><p class="font-black text-slate-900">Recorrido del pedido</p><p id="mapa-titulo" class="text-[11px] text-slate-500"></p></div>' +
         '<button id="mapa-cerrar" type="button" class="p-1 text-slate-400 text-2xl leading-none">×</button></div><div id="mapa-rep" style="height:52vh;border-radius:1rem;z-index:0"></div>' +
-        '<p class="text-[11px] text-slate-500"><b class="text-brand-700">R</b> = retiro · <b class="text-amber-600">E</b> = entrega (la línea es solo una guía, no la ruta)</p><div id="mapa-nav" class="flex gap-2"></div></div>';
+        '<p class="text-[11px] text-slate-500"><b class="text-brand-700">R</b> = retiro · <b class="text-amber-600">E</b> = entrega (la línea es solo una guía, no la ruta)</p><p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p><div id="mapa-nav" class="flex gap-2"></div></div>';
       document.body.appendChild(m);
     }
     return m;
@@ -328,12 +334,12 @@
   };
 
   /* --- Mapa del pedido y «Cómo llegar» --- */
-  function enlacesNav(lat, lng) {
-    const la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6);
+  function enlacesNav(lat, lng, dir) {
+    const la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6), q = encodeURIComponent(textoDir(dir));
     const a = (href, txt) => '<a href="' + href + '" target="_blank" rel="noopener" class="flex-1 text-center text-xs font-black bg-slate-900 text-white rounded-xl py-2.5 active:scale-95">' + txt + '</a>';
-    return a('https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=driving', '🧭 Google Maps') +
-           a('https://waze.com/ul?ll=' + la + ',' + lo + '&navigate=yes', '🧭 Waze') +
-           (esIOS ? a('https://maps.apple.com/?daddr=' + la + ',' + lo + '&dirflg=d', '🧭 Apple Maps') : '');
+    return a(urlDir(dir, 'google'), '🧭 Google Maps') + a(urlDir(dir, 'waze'), '🧭 Waze') +
+           (esIOS ? a('https://maps.apple.com/?daddr=' + q + '&dirflg=d', '🧭 Apple Maps') : '') +
+           '</div><div class="flex gap-2 mt-1"><a href="https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=driving" target="_blank" rel="noopener" class="flex-1 text-center text-[11px] font-bold text-slate-500 underline py-1">📍 Ir al pin (aproximado)</a>';
   }
   let mapaPed = null, capaPed = null;
   function modalMapa() {
@@ -352,9 +358,9 @@
     const R0 = [Number(o.retiro_lat), Number(o.retiro_lng)], E0 = [Number(o.entrega_lat), Number(o.entrega_lng)];
     const km = dist({ lat: R0[0], lng: R0[1] }, { lat: E0[0], lng: E0[1] }) / 1000;
     $('mp-dist').textContent = '📏 Entre el retiro y la entrega hay unos ' + km.toFixed(1).replace('.', ',') + ' km en línea recta.';
-    const bloque = (titulo, dir, pos) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-[11px] text-slate-500 mb-1">' + esc(fixDir(dir)) + '</p><div class="flex gap-2">' + enlacesNav(pos[0], pos[1]) + '</div></div>';
+    const bloque = (titulo, dir, pos) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-base font-black text-slate-800 mb-1">' + esc(fixDir(dir)) + '</p><div class="flex gap-2">' + enlacesNav(pos[0], pos[1], dir) + '</div></div>';
     const bR = bloque('📍 Cómo llegar al retiro', o.retiro_dir, R0), bE = bloque('🏁 Cómo llegar a la entrega', o.entrega_dir, E0);
-    $('mp-nav').innerHTML = o.estado === 'retirado' ? bE + bR : bR + bE;      // lo que toca primero, arriba
+    $('mp-nav').innerHTML = '<p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p>' + (o.estado === 'retirado' ? bE + bR : bR + bE);      // lo que toca primero, arriba
     setTimeout(() => {
       if (!mapaPed) { mapaPed = L.map('mp-mapa'); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaPed); capaPed = L.layerGroup().addTo(mapaPed); }
       capaPed.clearLayers();
@@ -391,11 +397,12 @@
     c.innerHTML = `<p class="text-center text-2xl font-black text-amber-600">🔔 ¡NUEVO PEDIDO!</p>
       <p id="sol-cuenta" class="text-center text-lg font-black text-slate-700"></p>
       <p class="text-center text-5xl font-black text-brand-600">${money(o.precio)}</p>
-      <div class="space-y-1.5"><p class="text-base text-slate-800">📍 <b>Retiro:</b> ${esc(fixDir(o.retiro_dir))}</p><p class="text-base text-slate-800">🏁 <b>Entrega:</b> ${esc(fixDir(o.entrega_dir))}</p>
+      <div class="space-y-1.5"><p class="text-xl font-black text-slate-900">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p><p class="text-xl font-black text-slate-900">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>
       ${o.comercio ? `<p class="text-sm text-slate-500">Comercio: ${esc(o.comercio)}</p>` : ''}</div>
       <div class="bg-amber-50 rounded-2xl p-3 space-y-1">${resumenPago(o, false)}</div>
       <button id="sol-mapa" type="button" class="w-full bg-amber-50 border border-amber-200 text-amber-800 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver recorrido (~${kmEntre(o)} km en línea recta)</button>
       <button id="sol-mapa" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver en el mapa y cómo llegar</button>
+      <p class="text-[11px] text-center font-bold text-amber-700">${AVISO_PIN}</p>
       <button id="sol-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-xl rounded-2xl py-5 shadow-lg active:scale-[.98]">ACEPTAR</button>
       <button id="sol-no" type="button" class="w-full bg-slate-100 text-slate-700 font-black text-base rounded-2xl py-3 active:scale-95">Rechazar</button>`;
     m.classList.remove('hidden'); m.classList.add('flex');
