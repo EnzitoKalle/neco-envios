@@ -270,7 +270,7 @@
       } else {
         mk(SIG[o.estado], 'bg-gradient-to-r from-brand-700 to-brand-500 text-white', async () => { const { error } = await _sb.rpc('ne_avanzar', { p_pedido: o.id }); if (error) mostrarToast(error.message); else mostrarToast('Listo'); refrescarPedidos(); });
         mk('💬 Chat', 'bg-slate-100 text-slate-700', async () => abrirChat(o.id));
-        mk('🗺️ Mapa y cómo llegar', 'bg-brand-50 text-brand-700 border border-brand-200', async () => abrirMapaPedido(o));
+        mk('🧭 Cómo llegar', 'bg-brand-50 text-brand-700 border border-brand-200', async () => abrirMapaPedido(o));
       }
       box.appendChild(d);
     });
@@ -278,76 +278,31 @@
 
   /* --- Mapa del recorrido y botón «¿Cómo llegar?» (abre el GPS del celular) --- */
   const peds = {};
-  const AVISO_PIN = '⚠️ El pin del mapa es aproximado y puede fallar. Guiate por la dirección escrita y confirmá con el cliente por el chat.';
+  const AVISO_PIN = 'ℹ️ Google Maps busca por la dirección escrita. Si no la ubica bien, confirmá la dirección con el cliente por el chat.';
   // «Cómo llegar» busca por la DIRECCIÓN ESCRITA (el pin puede estar mal). El pin queda como opción aparte.
   function textoDir(dir) {
     const t = String(fixDir(dir || '')).replace(SUF_APROX, '').trim(), m = t.match(/\d+/);
     return t + ', ' + (m && +m[0] >= 500 ? 'Quequén, ' : '') + 'Necochea, Buenos Aires, Argentina';
   }
   function modoViaje() { return { moto: 'two-wheeler', bici: 'bicycling', auto: 'driving' }[R.perfil && R.perfil.vehiculo] || 'driving'; }
-  function urlDir(dir, app) {
-    const q = encodeURIComponent(textoDir(dir));
-    if (app === 'waze') return 'https://waze.com/ul?q=' + q + '&navigate=yes';
-    return 'https://www.google.com/maps/dir/?api=1&destination=' + q + '&travelmode=' + modoViaje();
+  function urlDir(dir) {
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(textoDir(dir)) + '&travelmode=' + modoViaje();
   }
   function destinoDe(o) { return o.estado === 'retirado' ? { dir: o.entrega_dir, lat: o.entrega_lat, lng: o.entrega_lng, txt: 'a la entrega' } : { dir: o.retiro_dir, lat: o.retiro_lat, lng: o.retiro_lng, txt: 'al retiro' }; }
   function navLinks(o) {
-    const d = destinoDe(o), cls = 'flex-1 text-center text-xs font-black rounded-xl py-2.5 active:scale-95 ';
-    return '<a href="' + esc(urlDir(d.dir, 'google')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>' +
-           '<a href="' + esc(urlDir(d.dir, 'waze')) + '" target="_blank" rel="noopener" class="' + cls + 'bg-sky-50 border border-sky-200 text-sky-700">Waze</a>';
+    const d = destinoDe(o);
+    return '<a href="' + esc(urlDir(d.dir)) + '" target="_blank" rel="noopener" class="flex-1 text-center text-xs font-black rounded-xl py-2.5 active:scale-95 bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>';
   }
-  function navFila(o) {
-    peds[o.id] = o;
-    const mapaBtn = '<button type="button" onclick="verMapaRep(\'' + esc(o.id) + '\')" class="flex-1 text-xs font-black bg-amber-50 border border-amber-200 text-amber-800 rounded-xl py-2.5 active:scale-95">🗺️ Ver mapa</button>';
-    return '<div class="flex gap-2 pt-1">' + (o.estado === 'solicitado' ? '' : navLinks(o)) + mapaBtn + '</div>';
-  }
+  function navFila(o) { peds[o.id] = o; return o.estado === 'solicitado' ? '' : '<div class="flex gap-2 pt-1">' + navLinks(o) + '</div>'; }
   window.navFila = navFila;
-  const kmEntre = o => (dist({ lat: Number(o.retiro_lat), lng: Number(o.retiro_lng) }, { lat: Number(o.entrega_lat), lng: Number(o.entrega_lng) }) / 1000).toFixed(1).replace('.', ',');
-  let mapaRep = null;
-  function modalMapa() {
-    let m = $('modal-mapa');
-    if (!m) {
-      m = document.createElement('div'); m.id = 'modal-mapa';
-      m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[75]';
-      m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3"><div class="flex justify-between items-start"><div><p class="font-black text-slate-900">Recorrido del pedido</p><p id="mapa-titulo" class="text-[11px] text-slate-500"></p></div>' +
-        '<button id="mapa-cerrar" type="button" class="p-1 text-slate-400 text-2xl leading-none">×</button></div><div id="mapa-rep" style="height:52vh;border-radius:1rem;z-index:0"></div>' +
-        '<p class="text-[11px] text-slate-500"><b class="text-brand-700">R</b> = retiro · <b class="text-amber-600">E</b> = entrega (la línea es solo una guía, no la ruta)</p><p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p><div id="mapa-nav" class="flex gap-2"></div></div>';
-      document.body.appendChild(m);
-    }
-    return m;
-  }
-  window.verMapaRep = id => {
-    const o = peds[id]; if (!o) return;
-    const m = modalMapa(); m.classList.remove('hidden'); m.classList.add('flex');
-    $('mapa-cerrar').onclick = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
-    $('mapa-titulo').textContent = 'A unos ' + kmEntre(o) + ' km en línea recta entre el retiro y la entrega';
-    $('mapa-nav').innerHTML = o.estado === 'solicitado' ? '' : navLinks(o);
-    if (mapaRep) { try { mapaRep.remove(); } catch (e) {} mapaRep = null; }
-    mapaRep = L.map('mapa-rep');
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaRep);
-    const a = [Number(o.retiro_lat), Number(o.retiro_lng)], b = [Number(o.entrega_lat), Number(o.entrega_lng)];
-    L.marker(a, { icon: mkIcon('#0b6e5a', 'R') }).addTo(mapaRep).bindTooltip('Retiro');
-    L.marker(b, { icon: mkIcon('#f59e0b', 'E') }).addTo(mapaRep).bindTooltip('Entrega');
-    L.polyline([a, b], { color: '#0b6e5a', weight: 3, dashArray: '6 8' }).addTo(mapaRep);
-    mapaRep.fitBounds([a, b], { padding: [40, 40], maxZoom: 16 });
-    setTimeout(() => { try { mapaRep.invalidateSize(); } catch (e) {} }, 80);
-  };
 
-  /* --- Mapa del pedido y «Cómo llegar» --- */
-  function enlacesNav(lat, lng, dir) {
-    const la = Number(lat).toFixed(6), lo = Number(lng).toFixed(6), q = encodeURIComponent(textoDir(dir));
-    const a = (href, txt) => '<a href="' + href + '" target="_blank" rel="noopener" class="flex-1 text-center text-xs font-black bg-slate-900 text-white rounded-xl py-2.5 active:scale-95">' + txt + '</a>';
-    return a(urlDir(dir, 'google'), '🧭 Google Maps') + a(urlDir(dir, 'waze'), '🧭 Waze') +
-           (esIOS ? a('https://maps.apple.com/?daddr=' + q + '&dirflg=d', '🧭 Apple Maps') : '') +
-           '</div><div class="flex gap-2 mt-1"><a href="https://www.google.com/maps/dir/?api=1&destination=' + la + ',' + lo + '&travelmode=driving" target="_blank" rel="noopener" class="flex-1 text-center text-[11px] font-bold text-slate-500 underline py-1">📍 Ir al pin (aproximado)</a>';
-  }
-  let mapaPed = null, capaPed = null;
+  /* --- Cómo llegar: sin mapa propio, solo links a Google Maps por la dirección escrita --- */
   function modalMapa() {
     let m = $('modal-mapa-ped');
     if (!m) {
       m = document.createElement('div'); m.id = 'modal-mapa-ped';
       m.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-3 z-[80]';
-      m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"><div class="flex justify-between items-center"><p class="font-black text-slate-900">🗺️ Mapa del pedido</p><button id="mp-x" type="button" class="p-1 text-slate-400 text-xl">✕</button></div><div id="mp-mapa" style="height:280px;border-radius:1rem;z-index:0"></div><p id="mp-dist" class="text-[11px] text-slate-500"></p><div id="mp-nav" class="space-y-3"></div></div>';
+      m.innerHTML = '<div class="bg-white w-full max-w-md rounded-3xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"><div class="flex justify-between items-center"><p class="font-black text-slate-900">🧭 Cómo llegar</p><button id="mp-x" type="button" class="p-1 text-slate-400 text-xl">✕</button></div><div id="mp-nav" class="space-y-3"></div></div>';
       document.body.appendChild(m);
     }
     return m;
@@ -355,19 +310,9 @@
   function abrirMapaPedido(o) {
     const m = modalMapa(); m.classList.remove('hidden'); m.classList.add('flex');
     $('mp-x').onclick = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
-    const R0 = [Number(o.retiro_lat), Number(o.retiro_lng)], E0 = [Number(o.entrega_lat), Number(o.entrega_lng)];
-    const km = dist({ lat: R0[0], lng: R0[1] }, { lat: E0[0], lng: E0[1] }) / 1000;
-    $('mp-dist').textContent = '📏 Entre el retiro y la entrega hay unos ' + km.toFixed(1).replace('.', ',') + ' km en línea recta.';
-    const bloque = (titulo, dir, pos) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-base font-black text-slate-800 mb-1">' + esc(fixDir(dir)) + '</p><div class="flex gap-2">' + enlacesNav(pos[0], pos[1], dir) + '</div></div>';
-    const bR = bloque('📍 Cómo llegar al retiro', o.retiro_dir, R0), bE = bloque('🏁 Cómo llegar a la entrega', o.entrega_dir, E0);
-    $('mp-nav').innerHTML = '<p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p>' + (o.estado === 'retirado' ? bE + bR : bR + bE);      // lo que toca primero, arriba
-    setTimeout(() => {
-      if (!mapaPed) { mapaPed = L.map('mp-mapa'); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapaPed); capaPed = L.layerGroup().addTo(mapaPed); }
-      capaPed.clearLayers();
-      L.marker(R0, { icon: mkIcon('#0b6e5a', 'R') }).addTo(capaPed); L.marker(E0, { icon: mkIcon('#f59e0b', 'E') }).addTo(capaPed);
-      L.polyline([R0, E0], { color: '#0b6e5a', weight: 3, dashArray: '6 8' }).addTo(capaPed);
-      mapaPed.invalidateSize(); mapaPed.fitBounds([R0, E0], { padding: [40, 40], maxZoom: 17 });
-    }, 60);
+    const bloque = (titulo, dir) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-lg font-black text-slate-800 mb-1">' + esc(fixDir(dir)) + '</p><a href="' + esc(urlDir(dir)) + '" target="_blank" rel="noopener" class="block text-center text-sm font-black bg-slate-900 text-white rounded-xl py-3 active:scale-95">🧭 Abrir en Google Maps</a></div>';
+    const bR = bloque('📍 Retiro', o.retiro_dir), bE = bloque('🏁 Entrega', o.entrega_dir);
+    $('mp-nav').innerHTML = '<p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p>' + (o.estado === 'retirado' ? bE + bR : bR + bE);
   }
 
   /* --- Pedido nuevo: ventana grande y llamativa --- */
@@ -400,9 +345,7 @@
       <div class="space-y-1.5"><p class="text-xl font-black text-slate-900">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p><p class="text-xl font-black text-slate-900">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>
       ${o.comercio ? `<p class="text-sm text-slate-500">Comercio: ${esc(o.comercio)}</p>` : ''}</div>
       <div class="bg-amber-50 rounded-2xl p-3 space-y-1">${resumenPago(o, false)}</div>
-      <button id="sol-mapa" type="button" class="w-full bg-amber-50 border border-amber-200 text-amber-800 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver recorrido (~${kmEntre(o)} km en línea recta)</button>
-      <button id="sol-mapa" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-sm rounded-2xl py-3 active:scale-95">🗺️ Ver en el mapa y cómo llegar</button>
-      <p class="text-[11px] text-center font-bold text-amber-700">${AVISO_PIN}</p>
+      <button id="sol-mapa" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-sm rounded-2xl py-3 active:scale-95">🧭 Ver cómo llegar (Google Maps)</button>
       <button id="sol-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-xl rounded-2xl py-5 shadow-lg active:scale-[.98]">ACEPTAR</button>
       <button id="sol-no" type="button" class="w-full bg-slate-100 text-slate-700 font-black text-base rounded-2xl py-3 active:scale-95">Rechazar</button>`;
     m.classList.remove('hidden'); m.classList.add('flex');
@@ -410,7 +353,6 @@
     const tick = () => { const s = Math.max(0, Math.round((fin - Date.now()) / 1000)); const e = $('sol-cuenta'); if (e) e.textContent = 'Respondé en ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (s <= 0) { cerrarSolicitud(); refrescarPedidos(); } };
     tick(); solTimer = setInterval(tick, 1000);
     const responder = async acepta => { const { error } = await _sb.rpc('ne_responder', { p_pedido: o.id, p_acepta: acepta }); if (error) mostrarToast(error.message); cerrarSolicitud(); refrescarPedidos(); };
-    $('sol-mapa').onclick = () => window.verMapaRep(o.id);
     $('sol-ok').onclick = () => responder(true); $('sol-no').onclick = () => responder(false); $('sol-mapa').onclick = () => abrirMapaPedido(o);
   }
 
