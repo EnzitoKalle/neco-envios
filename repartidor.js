@@ -12,7 +12,7 @@
   async function salir() { if (!confirm('¿Cerrar sesión de Google?')) return; localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); }
   root().addEventListener('click', e => { if (e.target.closest('[data-salir]')) salir(); });
 
-  function detener() { detenerUbicacion(false); clearInterval(R.seg); clearInterval(R.poll); clearInterval(R.hb); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
+  function detener() { detenerUbicacion(false); clearInterval(R.seg); clearInterval(R.poll); clearInterval(R.hb); clearInterval(R.pushT); cerrarCamara(); if (R.canal) { _sb.removeChannel(R.canal); R.canal = null; } cerrarSolicitud(); }
   function cerrarCamara() { if (R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; } }
 
   window.irRepartidor = async function () { vista('repartidor'); await pantalla(); };
@@ -188,15 +188,57 @@
   function pPanel() {
     const p = R.perfil;
     root().innerHTML = volver() + `
+      <div id="r-push"></div>
       <div class="flex items-center gap-3 mb-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(p.rostro_path || '')}?t=${Date.now() % 100000}" class="w-12 h-12 rounded-2xl object-cover bg-slate-100 border border-brand-200" alt="">
       <div class="flex-1 min-w-0"><p class="font-black text-slate-900 truncate">${esc(p.nombre)}</p><p id="r-badge" class="text-[11px] font-bold"></p></div></div>
       <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'horarios:Ajustes', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-[11px] font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
       <div id="r-cont"></div>`;
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
+    R.pushEst = null; pintarPush().then(est => { if (est && est !== 'ok' && !R.pushModalVisto) { R.pushModalVisto = true; modalPush(est); } });
     $('r-badge').textContent = p.comparte_ubicacion ? '📍 Seguimiento en vivo activado' : ''; $('r-badge').className = 'text-[11px] font-bold text-brand-600';
     clearInterval(R.seg); R.seg = setInterval(revisarSeguimiento, 15000); revisarSeguimiento();
     if (R.tab === 'pedidos') tabPedidos(); else if (R.tab === 'horarios') tabAjustes(); else if (R.tab === 'zonas') tabZonas(); else tabHistorial();
+  }
+
+  /* ---------- AVISOS: cartel grande hasta que se activen las notificaciones ---------- */
+  const AYUDA_PUSH = {
+    bloqueado: 'Las bloqueaste. Para activarlas: tocá el candado 🔒 (o los 3 puntitos ⋮) de la barra del navegador → Permisos o Configuración del sitio → Notificaciones → Permitir. Después tocá «Revisar».',
+    'ios-instalar': 'En iPhone primero instalá la app: tocá Compartir (cuadrado con flecha) → «Agregar a pantalla de inicio». Abrila desde el ícono y activá las notificaciones ahí.',
+    'no-soportado': 'Este navegador no permite avisos. Instalá la app o abrí NecoEnvíos con Chrome.'
+  };
+  function cerrarModalPush() { const m = $('modal-push'); if (m) m.remove(); }
+  function modalPush(est) {
+    cerrarModalPush();
+    const m = document.createElement('div'); m.id = 'modal-push';
+    m.className = 'fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-[95]';
+    m.innerHTML = `<div class="bg-white w-full max-w-sm rounded-3xl p-5 text-center space-y-3 shadow-2xl">
+      <p class="text-6xl">🔔</p><p class="text-2xl font-black text-slate-900 leading-tight">Activá las notificaciones</p>
+      <p class="text-sm font-bold text-slate-600">Sin notificaciones no te enterás cuando te llega un pedido.</p>
+      ${AYUDA_PUSH[est] ? `<p class="text-xs text-slate-600 bg-slate-100 rounded-xl p-2 text-left">${AYUDA_PUSH[est]}</p>` : ''}
+      <button id="mp-push-ok" type="button" class="w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-lg rounded-2xl py-4 active:scale-95">${est === 'pedir' ? 'ACTIVAR NOTIFICACIONES' : 'Entendido'}</button>
+      <button id="mp-push-no" type="button" class="text-xs font-bold text-slate-400 underline py-1">Ahora no</button></div>`;
+    document.body.appendChild(m);
+    $('mp-push-no').onclick = cerrarModalPush;
+    $('mp-push-ok').onclick = async () => { if (est === 'pedir') { const r = await window.NecoPush.activar(); if (!r.ok) mostrarToast(r.msg); } cerrarModalPush(); R.pushEst = null; pintarPush(); };
+  }
+  async function pintarPush() {
+    clearInterval(R.pushT);
+    if (!$('r-push') || !window.NecoPush) return null;
+    const est = await window.NecoPush.estado(), box = $('r-push');
+    if (!box) return null;
+    if (est === 'ok') { box.innerHTML = ''; R.pushEst = est; cerrarModalPush(); return est; }
+    if (R.pushEst !== est) {
+      R.pushEst = est;
+      box.innerHTML = `<div class="bg-rose-600 text-white rounded-3xl p-4 text-center shadow-lg space-y-2 mb-3 border-4 border-rose-300">
+        <p class="text-2xl font-black leading-tight">🔔 ACTIVÁ NOTIFICACIONES</p>
+        <p class="text-base font-bold">Están desactivadas: si llega un pedido no te vas a enterar</p>
+        ${AYUDA_PUSH[est] ? `<p class="text-xs bg-white/20 rounded-xl p-2 text-left">${AYUDA_PUSH[est]}</p>` : ''}
+        <button id="r-push-btn" type="button" class="w-full bg-white text-rose-700 font-black text-lg rounded-2xl py-4 active:scale-95">${est === 'pedir' ? 'ACTIVAR AHORA' : 'Revisar'}</button></div>`;
+      $('r-push-btn').onclick = async () => { if (est === 'pedir') { const r = await window.NecoPush.activar(); if (!r.ok) mostrarToast(r.msg); } R.pushEst = null; pintarPush(); };
+    }
+    R.pushT = setInterval(pintarPush, 8000);   // se revisa solo, por si las activa desde los ajustes del celular
+    return est;
   }
 
   /* --- Pedidos --- */

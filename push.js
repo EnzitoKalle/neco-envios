@@ -6,15 +6,6 @@
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const soportado = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-  if (!configurado) return;
-  if (!soportado && !(ios && !standalone)) return;
-
-  const b = document.createElement('button');
-  b.id = 'btn-push'; b.type = 'button'; b.title = 'Activar avisos';
-  b.className = 'bg-brand-50 border border-brand-200 text-brand-600 p-2 rounded-xl active:scale-95 shadow-sm flex items-center';
-  b.innerHTML = '<i data-lucide="bell" class="w-4 h-4"></i>';
-  const g = $('btn-google'); g.parentNode.insertBefore(b, g);
-  ico();
 
   const key = () => { let s = VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 
@@ -24,19 +15,52 @@
     const { error } = await _sb.rpc('ne_guardar_push', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
     if (error) throw error;
   }
+  async function suscribir() {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() });
+    await guardar(sub);
+  }
+
+  // Estado de los avisos: 'ok' | 'pedir' (todavía no se pidió permiso) | 'bloqueado' | 'ios-instalar' | 'no-soportado'
+  let guardadoPara = null;
+  async function estado() {
+    if (!configurado) return 'no-soportado';
+    if (!soportado) return (ios && !standalone) ? 'ios-instalar' : 'no-soportado';
+    if (Notification.permission === 'denied') return 'bloqueado';
+    if (Notification.permission !== 'granted') return 'pedir';
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      const { data } = await _sb.auth.getSession(), uid = data.session && data.session.user.id;
+      if (!sub) { await suscribir(); guardadoPara = uid; }
+      else if (uid && guardadoPara !== uid) { await guardar(sub); guardadoPara = uid; }
+      return 'ok';
+    } catch (e) { return 'pedir'; }
+  }
+  // Pide el permiso y deja el aviso andando. Tiene que llamarse desde un toque del usuario.
   async function activar() {
-    if (!soportado) { mostrarToast('En iPhone primero instalá la app: Compartir → Agregar a pantalla de inicio. Después activá los avisos desde la app.'); return; }
+    if (!soportado) return { ok: false, msg: (ios && !standalone) ? 'En iPhone primero instalá la app: Compartir → Agregar a pantalla de inicio. Después activá los avisos desde la app.' : 'Este navegador no permite avisos.' };
     try {
       const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { mostrarToast('Los avisos quedaron bloqueados. Podés activarlos en los ajustes del navegador.'); return; }
-      const reg = await navigator.serviceWorker.ready;
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() });
-      await guardar(sub);
-      b.classList.add('hidden'); mostrarToast('¡Avisos activados!');
-    } catch (e) { mostrarToast('No se pudieron activar los avisos: ' + (e.message || e)); }
+      if (perm !== 'granted') return { ok: false, msg: 'Los avisos quedaron bloqueados. Podés activarlos en los ajustes del navegador.' };
+      await suscribir();
+      return { ok: true };
+    } catch (e) { return { ok: false, msg: 'No se pudieron activar los avisos: ' + (e.message || e) }; }
   }
-  b.onclick = activar;
+  window.NecoPush = { estado, activar };
+
+  if (!configurado) return;
+  if (!soportado && !(ios && !standalone)) return;
+
+  // Campanita de la barra de arriba (para clientes y para quien quiera activarlos desde ahí)
+  const b = document.createElement('button');
+  b.id = 'btn-push'; b.type = 'button'; b.title = 'Activar avisos';
+  b.className = 'bg-brand-50 border border-brand-200 text-brand-600 p-2 rounded-xl active:scale-95 shadow-sm flex items-center';
+  b.innerHTML = '<i data-lucide="bell" class="w-4 h-4"></i>';
+  const g = $('btn-google'); g.parentNode.insertBefore(b, g);
+  ico();
+  b.onclick = async () => { const r = await activar(); if (r.ok) { b.classList.add('hidden'); mostrarToast('¡Avisos activados!'); } else mostrarToast(r.msg); };
 
   // Si ya había permiso, vuelve a registrar la suscripción con el usuario actual (por si cambió de cuenta)
   async function revisar() {
