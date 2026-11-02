@@ -171,6 +171,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
 <!-- MODAL: CHAT / PEDIDO -->
 <div id="modal-chat" class="modal-bottom-sheet fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
   <div class="clean-modal rounded-3xl p-5 w-full max-w-md flex flex-col gap-3 max-h-[90vh] overflow-y-auto text-slate-800">
+    <div id="ch-push"></div>
     <div class="flex justify-between items-start">
       <div class="min-w-0"><h3 class="text-base font-black text-slate-900">Tu pedido</h3><span id="ch-estado" class="inline-block mt-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-brand-100 text-brand-700"></span></div>
       <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -659,7 +660,7 @@ function celebrar(){
   document.body.appendChild(box); setTimeout(() => { try { box.remove(); } catch (e) {} }, 3600);
 }
 async function abrirChat(id){
-  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-ayuda').classList.add('hidden'); $('ch-rep').classList.add('hidden'); $('ch-mapa-box').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat');
+  chatId = id; ultimoMsg = 0; chatRep = null; chatPedido = null; $('ch-ayuda').classList.add('hidden'); $('ch-rep').classList.add('hidden'); $('ch-mapa-box').classList.add('hidden'); $('ch-msgs').innerHTML = ''; abrirModal('modal-chat'); pintarPushChat();
   await refrescarPedido(); await cargarMensajes();
   if (chatCanal) _sb.removeChannel(chatCanal);
   chatCanal = _sb.channel('ped-' + id)
@@ -669,6 +670,47 @@ async function abrirChat(id){
   clearInterval(chatPoll);
   chatPoll = setInterval(async () => { await _sb.rpc('ne_vencer'); await refrescarPedido(); await cargarMensajes(); }, 6000); // respaldo
 }
+/* ---- Cartel de avisos dentro del chat: si no están activados, no te enterás cuando te escriben con la app cerrada ---- */
+async function pintarPushChat(){
+  const box = $('ch-push'); if (!box || !window.NecoPush) return;
+  const est = await window.NecoPush.estado();
+  if (est === 'ok' || est === 'no-soportado') { box.innerHTML = ''; return; }
+  const ayuda = window.NecoPush.ayuda[est];
+  box.innerHTML = '<div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 space-y-1.5">' +
+    '<p class="text-sm font-black text-amber-800">🔔 Activá los avisos</p>' +
+    '<p class="text-xs font-bold text-amber-800">Así te enteramos cuando te escriben en el chat, aunque tengas la app cerrada.</p>' +
+    (ayuda ? '<p class="text-[11px] text-amber-800 bg-white/60 rounded-xl p-2">' + esc(ayuda) + '</p>' : '') +
+    '<button id="ch-push-btn" type="button" class="w-full bg-amber-500 text-white font-black text-sm rounded-xl py-3 active:scale-95">' + (est === 'pedir' ? 'ACTIVAR AVISOS' : 'Revisar') + '</button></div>';
+  $('ch-push-btn').onclick = async () => { if (est === 'pedir') { const r = await window.NecoPush.activar(); if (!r.ok) mostrarToast(r.msg); } pintarPushChat(); };
+}
+/* ---- Cartel dentro de la app cuando llega un mensaje nuevo y no estás mirando ese chat ---- */
+let msgCanal = null, msgUid = null, avisoT = null;
+function sonidoAviso(){
+  try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 880; g.gain.value = 0.08; o.start(); setTimeout(() => { try { o.stop(); c.close(); } catch (e) {} }, 180); } catch (e) {}
+}
+function avisoMensaje(m){
+  let b = $('aviso-msg');
+  if (!b) { b = document.createElement('div'); b.id = 'aviso-msg'; b.className = 'fixed top-3 left-3 right-3 z-[120] max-w-md mx-auto'; document.body.appendChild(b); }
+  b.innerHTML = '<button type="button" class="w-full text-left bg-brand-700 text-white rounded-2xl p-3 shadow-2xl border-2 border-brand-300 active:scale-95"><p class="text-xs font-black">💬 Mensaje nuevo en tu pedido</p><p class="text-sm font-bold mt-0.5 break-words">' + esc(String(m.texto || '').slice(0, 90)) + '</p><p class="text-[11px] mt-1 underline">Tocá para abrir el chat</p></button>';
+  b.firstElementChild.onclick = () => { b.innerHTML = ''; abrirChat(m.pedido_id); };
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+  sonidoAviso();
+  clearTimeout(avisoT); avisoT = setTimeout(() => { b.innerHTML = ''; }, 15000);
+}
+function vigilarMensajes(uid){
+  if (msgUid === uid) return;
+  if (msgCanal) { _sb.removeChannel(msgCanal); msgCanal = null; }
+  msgUid = uid; if (!uid) return;
+  msgCanal = _sb.channel('avisos-msg-' + uid)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ne_mensajes' }, p => {
+      const m = p.new || {};
+      if (m.autor_id === uid || m.tipo !== 'texto') return;
+      if (chatId === m.pedido_id && !$('modal-chat').classList.contains('hidden')) return;   // ya lo estás viendo
+      avisoMensaje(m);
+    }).subscribe();
+}
+_sb.auth.getSession().then(({ data }) => vigilarMensajes(data.session ? data.session.user.id : null));
+_sb.auth.onAuthStateChange((ev, s) => vigilarMensajes(s ? s.user.id : null));
 function cerrarChat(){ cerrarModal('modal-chat'); clearInterval(chatPoll); if (chatCanal) { _sb.removeChannel(chatCanal); chatCanal = null; } chatId = null; }
 async function refrescarPedido(){
   if (!chatId) return;

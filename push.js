@@ -48,7 +48,12 @@
       return { ok: true };
     } catch (e) { return { ok: false, msg: 'No se pudieron activar los avisos: ' + (e.message || e) }; }
   }
-  window.NecoPush = { estado, activar };
+  const ayuda = {
+    bloqueado: 'Las bloqueaste. Para activarlas: tocá el candado 🔒 (o los 3 puntitos ⋮) de la barra del navegador → Permisos o Configuración del sitio → Notificaciones → Permitir. Después tocá «Revisar».',
+    'ios-instalar': 'En iPhone primero instalá la app: tocá Compartir (cuadrado con flecha) → «Agregar a pantalla de inicio». Abrila desde el ícono y activá los avisos ahí.',
+    'no-soportado': 'Este navegador no permite avisos. Instalá la app o abrí NecoEnvíos con Chrome.'
+  };
+  window.NecoPush = { estado, activar, ayuda };
 
   if (!configurado) return;
   if (!soportado && !(ios && !standalone)) return;

@@ -301,7 +301,7 @@
     L.forEach(o => {
       const d = document.createElement('div'); d.className = 'clean-card rounded-3xl space-y-2 ' + (o.estado === 'solicitado' ? 'p-5 border-4 border-amber-400' : 'p-4');
       d.innerHTML = `<div class="flex justify-between items-start"><b class="text-xs text-brand-700">${esc(ESTADOS[o.estado])}</b><b class="${o.estado === 'solicitado' ? 'text-3xl' : 'text-lg'} text-brand-600">${money(o.precio)}</b></div>
-        <p class="text-base font-black text-slate-800">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p><p class="text-base font-black text-slate-800">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>${resumenPago(o, false)}${navFila(o)}
+        <p class="text-base font-black text-slate-800">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p>${lineaEntre(o.retiro_dir)}<p class="text-base font-black text-slate-800">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>${lineaEntre(o.entrega_dir)}${resumenPago(o, false)}${navFila(o)}
         ${o.comercio ? `<p class="text-[11px] text-slate-400">Comercio: ${esc(o.comercio)}</p>` : ''}<p class="text-[11px] text-slate-400">Cliente: ${esc(o.cliente_nombre)}</p>
         <div class="flex flex-wrap gap-2 pt-1" data-acc></div>`;
       const acc = d.querySelector('[data-acc]');
@@ -320,8 +320,13 @@
 
   /* --- Mapa del recorrido y botón «¿Cómo llegar?» (abre el GPS del celular) --- */
   const peds = {};
-  const AVISO_PIN = 'ℹ️ Google Maps busca por la dirección escrita. Si no la ubica bien, confirmá la dirección con el cliente por el chat.';
+  const AVISO_PIN = '⚠️ Google no siempre encuentra bien las direcciones de Necochea: el pin puede caer en otro lado. Guiate por la dirección escrita y las calles de referencia, y confirmá con el cliente por el chat.';
   // «Cómo llegar» busca por la DIRECCIÓN ESCRITA (el pin puede estar mal). El pin queda como opción aparte.
+  // «Entre la 75 y la 77»: lo calcula el mismo motor que decide la zona, a partir de la calle y la altura escritas
+  function entreTxt(dir) {
+    try { const r = window.ZonasCalle && window.ZonasCalle.calcular(String(dir || '').replace(SUF_APROX, '')); const m = r && r.ent && r.ent.match(/^entre (\S+) y (\S+)$/); return m ? 'entre la ' + m[1] + ' y la ' + m[2] : ''; } catch (e) { return ''; }
+  }
+  function lineaEntre(dir) { const t = entreTxt(dir); return t ? '<p class="text-sm font-bold text-brand-700">📐 La cuadra queda ' + esc(t) + '</p>' : ''; }
   function textoDir(dir) {
     const t = String(fixDir(dir || '')).replace(SUF_APROX, '').trim(), m = t.match(/\d+/);
     return t + ', ' + (m && +m[0] >= 500 ? 'Quequén, ' : '') + 'Necochea, Buenos Aires, Argentina';
@@ -335,7 +340,7 @@
     const d = destinoDe(o);
     return '<a href="' + esc(urlDir(d.dir)) + '" target="_blank" rel="noopener" class="flex-1 text-center text-xs font-black rounded-xl py-2.5 active:scale-95 bg-brand-600 text-white">🧭 ¿Cómo llegar ' + d.txt + '?</a>';
   }
-  function navFila(o) { peds[o.id] = o; return o.estado === 'solicitado' ? '' : '<div class="flex gap-2 pt-1">' + navLinks(o) + '</div>'; }
+  function navFila(o) { peds[o.id] = o; return o.estado === 'solicitado' ? '' : '<div class="flex gap-2 pt-1">' + navLinks(o) + '</div><p class="text-[10px] font-bold text-amber-700">⚠️ El pin de Google puede estar mal: guiate por la dirección escrita.</p>'; }
   window.navFila = navFila;
 
   /* --- Cómo llegar: sin mapa propio, solo links a Google Maps por la dirección escrita --- */
@@ -352,7 +357,7 @@
   function abrirMapaPedido(o) {
     const m = modalMapa(); m.classList.remove('hidden'); m.classList.add('flex');
     $('mp-x').onclick = () => { m.classList.add('hidden'); m.classList.remove('flex'); };
-    const bloque = (titulo, dir) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-lg font-black text-slate-800 mb-1">' + esc(fixDir(dir)) + '</p><a href="' + esc(urlDir(dir)) + '" target="_blank" rel="noopener" class="block text-center text-sm font-black bg-slate-900 text-white rounded-xl py-3 active:scale-95">🧭 Abrir en Google Maps</a></div>';
+    const bloque = (titulo, dir) => '<div><p class="text-xs font-black text-brand-700 mb-0.5">' + titulo + '</p><p class="text-lg font-black text-slate-800 mb-1">' + esc(fixDir(dir)) + '</p>' + lineaEntre(dir) + '<a href="' + esc(urlDir(dir)) + '" target="_blank" rel="noopener" class="block text-center text-sm font-black bg-slate-900 text-white rounded-xl py-3 active:scale-95">🧭 Abrir en Google Maps</a></div>';
     const bR = bloque('📍 Retiro', o.retiro_dir), bE = bloque('🏁 Entrega', o.entrega_dir);
     $('mp-nav').innerHTML = '<p class="text-[11px] font-bold text-amber-700 bg-amber-50 rounded-xl p-2">' + AVISO_PIN + '</p>' + (o.estado === 'retirado' ? bE + bR : bR + bE);
   }
@@ -384,7 +389,7 @@
     c.innerHTML = `<p class="text-center text-2xl font-black text-amber-600">🔔 ¡NUEVO PEDIDO!</p>
       <p id="sol-cuenta" class="text-center text-lg font-black text-slate-700"></p>
       <p class="text-center text-5xl font-black text-brand-600">${money(o.precio)}</p>
-      <div class="space-y-1.5"><p class="text-xl font-black text-slate-900">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p><p class="text-xl font-black text-slate-900">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>
+      <div class="space-y-1.5"><p class="text-xl font-black text-slate-900">📍 Retiro: ${esc(fixDir(o.retiro_dir))}</p>${lineaEntre(o.retiro_dir)}<p class="text-xl font-black text-slate-900">🏁 Entrega: ${esc(fixDir(o.entrega_dir))}</p>${lineaEntre(o.entrega_dir)}
       ${o.comercio ? `<p class="text-sm text-slate-500">Comercio: ${esc(o.comercio)}</p>` : ''}</div>
       <div class="bg-amber-50 rounded-2xl p-3 space-y-1">${resumenPago(o, false)}</div>
       <button id="sol-mapa" type="button" class="w-full bg-white border-2 border-brand-200 text-brand-700 font-black text-sm rounded-2xl py-3 active:scale-95">🧭 Ver cómo llegar (Google Maps)</button>
