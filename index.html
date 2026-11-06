@@ -268,8 +268,32 @@ async function asegurarSesion(){
 }
 const esAnon = () => !!(sesion && sesion.user && sesion.user.is_anonymous);
 function pintarLogin(){ const lg = !!(sesion && !esAnon()); $('lbl-google').textContent = lg ? 'Salir' : 'Ingresar'; $('lbl-google').classList.toggle('hidden', !lg); $('btn-google').title = lg ? 'Cerrar sesión' : 'Ingresar con Google'; }
+/* ---- App Android (Capacitor): Google no deja iniciar sesión dentro de una vista web, así que se abre en el navegador del celu y vuelve con un link ---- */
+const esNativo = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const APP_REDIRECT = 'com.necoenvios.repartidor://auth';
+async function loginGoogleNativo(){
+  try {
+    const { Browser } = window.Capacitor.Plugins;
+    const r = await _sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin + '/app-auth.html', skipBrowserRedirect: true } });   // vuelve por una página nuestra, que reabre la app
+    if (r.error) return mostrarToast('Error: ' + r.error.message);
+    await Browser.open({ url: r.data.url });
+  } catch (e) { mostrarToast('No se pudo abrir el ingreso con Google: ' + (e.message || e)); }
+}
+if (esNativo()) {
+  window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
+    if (!String(url).startsWith(APP_REDIRECT)) return;
+    try { await window.Capacitor.Plugins.Browser.close(); } catch (e) {}
+    const q = new URLSearchParams((url.split('#')[1] || '') + '&' + (url.split('?')[1] || '').split('#')[0]);
+    let err = null;
+    if (q.get('access_token') && q.get('refresh_token')) { const r = await _sb.auth.setSession({ access_token: q.get('access_token'), refresh_token: q.get('refresh_token') }); err = r.error; }
+    else if (q.get('code')) { const r = await _sb.auth.exchangeCodeForSession(q.get('code')); err = r.error; }
+    else err = { message: q.get('error_description') || 'No llegó la sesión' };
+    if (err) mostrarToast('Error al ingresar: ' + err.message); else location.reload();
+  });
+}
 async function loginGoogle(){
   if (sesion && !esAnon()) { if (confirm('¿Cerrar sesión de Google?')) { localStorage.removeItem('ne_volver'); await _sb.auth.signOut(); location.reload(); } return; }
+  if (esNativo()) return loginGoogleNativo();
   let r;
   if (esAnon()) r = await _sb.auth.linkIdentity({ provider:'google', options:{ redirectTo: location.origin } });
   if (!esAnon() || (r && r.error)) r = await _sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: location.origin } });
