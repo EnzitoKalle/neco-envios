@@ -5,7 +5,8 @@
   const configurado = VAPID_PUBLIC.length > 60;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-  const soportado = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const nativo = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const soportado = nativo || ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
 
   const key = () => { let s = VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); };
 
@@ -22,9 +23,45 @@
     await guardar(sub);
   }
 
+  /* ---- App Android: avisos con Firebase (FCM) ---- */
+  let fcmListo = false;
+  const PN = () => window.Capacitor.Plugins.PushNotifications;
+  async function guardarFcm(token) {
+    await asegurarSesion();
+    const { error } = await _sb.rpc('ne_guardar_fcm', { p_token: token });
+    if (error) throw error;
+  }
+  async function registrarNativo() {
+    if (!fcmListo) {
+      fcmListo = true;
+      PN().addListener('registration', t => { guardarFcm(t.value).catch(() => {}); });
+      PN().addListener('registrationError', () => {});
+      PN().addListener('pushNotificationReceived', n => { mostrarToast('🔔 ' + ((n.title || '') + (n.body ? ': ' + n.body : ''))); });   // con la app abierta Android no muestra el aviso, así que se muestra acá
+      try { await PN().createChannel({ id: 'pedidos', name: 'Pedidos y mensajes', description: 'Avisos de pedidos nuevos y mensajes', importance: 5, visibility: 1, vibration: true }); } catch (e) {}
+    }
+    await PN().register();
+  }
+  async function estadoNativo() {
+    try {
+      if (!window.Capacitor.Plugins.PushNotifications) { window.__pushError = 'el módulo de avisos (PushNotifications) no está dentro de la app'; return 'error'; }
+      const p = await PN().checkPermissions();
+      if (p.receive === 'granted') { await registrarNativo(); return 'ok'; }
+      return p.receive === 'denied' ? 'bloqueado' : 'pedir';
+    } catch (e) { window.__pushError = String((e && e.message) || e); return 'error'; }
+  }
+  async function activarNativo() {
+    try {
+      const p = await PN().requestPermissions();
+      if (p.receive !== 'granted') return { ok: false, msg: 'Las notificaciones quedaron bloqueadas. Activalas en Ajustes del celular → Aplicaciones → NecoEnvíos → Notificaciones.' };
+      await registrarNativo();
+      return { ok: true };
+    } catch (e) { return { ok: false, msg: 'No se pudieron activar los avisos: ' + (e.message || e) }; }
+  }
+
   // Estado de los avisos: 'ok' | 'pedir' (todavía no se pidió permiso) | 'bloqueado' | 'ios-instalar' | 'no-soportado'
   let guardadoPara = null;
   async function estado() {
+    if (nativo) return estadoNativo();
     if (!configurado) return 'no-soportado';
     if (!soportado) return (ios && !standalone) ? 'ios-instalar' : 'no-soportado';
     if (Notification.permission === 'denied') return 'bloqueado';
@@ -40,6 +77,7 @@
   }
   // Pide el permiso y deja el aviso andando. Tiene que llamarse desde un toque del usuario.
   async function activar() {
+    if (nativo) return activarNativo();
     if (!soportado) return { ok: false, msg: (ios && !standalone) ? 'En iPhone primero instalá la app: Compartir → Agregar a pantalla de inicio. Después activá los avisos desde la app.' : 'Este navegador no permite avisos.' };
     try {
       const perm = await Notification.requestPermission();
@@ -49,12 +87,14 @@
     } catch (e) { return { ok: false, msg: 'No se pudieron activar los avisos: ' + (e.message || e) }; }
   }
   const ayuda = {
-    bloqueado: 'Las bloqueaste. Para activarlas: tocá el candado 🔒 (o los 3 puntitos ⋮) de la barra del navegador → Permisos o Configuración del sitio → Notificaciones → Permitir. Después tocá «Revisar».',
+    get error() { return 'No se pudieron activar los avisos de la app. Error técnico: ' + (window.__pushError || 'desconocido') + '. Sacá una captura de esta pantalla y mandásela a quien te dio la app.'; },
+    bloqueado: nativo ? 'Las bloqueaste. Para activarlas: Ajustes del celular → Aplicaciones → NecoEnvíos → Notificaciones → Permitir. Después volvé y tocá «Revisar».' : 'Las bloqueaste. Para activarlas: tocá el candado 🔒 (o los 3 puntitos ⋮) de la barra del navegador → Permisos o Configuración del sitio → Notificaciones → Permitir. Después tocá «Revisar».',
     'ios-instalar': 'En iPhone primero instalá la app: tocá Compartir (cuadrado con flecha) → «Agregar a pantalla de inicio». Abrila desde el ícono y activá los avisos ahí.',
     'no-soportado': 'Este navegador no permite avisos. Instalá la app o abrí NecoEnvíos con Chrome.'
   };
   window.NecoPush = { estado, activar, ayuda };
 
+  if (nativo) return;   // en la app no hace falta la campanita: el cartel grande del panel se encarga
   if (!configurado) return;
   if (!soportado && !(ios && !standalone)) return;
 
