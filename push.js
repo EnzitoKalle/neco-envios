@@ -36,6 +36,8 @@
       fcmListo = true;
       PN().addListener('registration', t => { guardarFcm(t.value).catch(() => {}); });
       PN().addListener('registrationError', () => {});
+      // Al tocar el aviso se abre el chat o el panel que corresponda (la dirección viene en el aviso)
+      PN().addListener('pushNotificationActionPerformed', a => { const u = a && a.notification && a.notification.data && a.notification.data.url; if (u && String(u).startsWith('/')) location.href = location.origin + u; });
       PN().addListener('pushNotificationReceived', n => { mostrarToast('🔔 ' + ((n.title || '') + (n.body ? ': ' + n.body : ''))); });   // con la app abierta Android no muestra el aviso, así que se muestra acá
       try { await PN().createChannel({ id: 'pedidos', name: 'Pedidos y mensajes', description: 'Avisos de pedidos nuevos y mensajes', importance: 5, visibility: 1, vibration: true }); } catch (e) {}
     }
