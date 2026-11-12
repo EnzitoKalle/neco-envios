@@ -31,6 +31,17 @@
     await cargarBase(); pPanel();
   }
 
+  /* ---------- Cartel para descargar la app (Android). Se muestra en el login, el registro y el panel mientras usen la web ---------- */
+  function cartelApk(conCierre) {
+    if (esApp() || esIOS) return '';
+    return `<div class="bg-brand-50 border-2 border-brand-200 rounded-3xl p-4 space-y-2 mb-3">
+      <p class="font-black text-brand-800">📲 Instalá la app de NecoEnvíos</p>
+      <p class="text-xs text-slate-600">Recibís los pedidos más rápido y con aviso aunque tengas el celu bloqueado.</p>
+      <a href="/descargas/NecoEnvios-Repartidor.apk" download class="block w-full text-center bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-base rounded-2xl py-3.5 shadow-md active:scale-[.98]">📲 DESCARGAR LA APP (Android)</a>
+      <details class="text-xs text-slate-700"><summary class="font-bold cursor-pointer text-brand-700">Cómo instalarla</summary><div class="mt-1 space-y-1"><p>1. Tocá el botón verde y esperá que se descargue.</p><p>2. Abrí el archivo descargado. Si el celu te avisa, tocá <b>Configuración</b> y activá <b>Permitir desde esta fuente</b>.</p><p>3. Si aparece un aviso de Play Protect, tocá <b>Más detalles → Instalar de todas formas</b>.</p><p>4. Abrí NecoEnvíos y entrá con tu cuenta de Google.</p></div></details>
+      ${conCierre ? '<button id="apk-no" type="button" class="text-[11px] font-bold text-slate-400 underline">Ahora no</button>' : ''}</div>`;
+  }
+
   /* ---------- 1. INSTALAR ---------- */
   function pInstalar() {
     root().innerHTML = volver() + card(`
@@ -53,9 +64,11 @@
     root().innerHTML = volver() + card(`
       <h2 class="text-xl font-black">Ingresá con Google</h2>
       <p class="text-xs text-slate-500">Para trabajar como repartidor necesitamos que ingreses con tu cuenta de Google.</p>
+      ${cartelApk(false)}
       ${btn('l-go', 'Continuar con Google')}`);
     $('l-go').onclick = async () => {
       localStorage.setItem('ne_volver', 'rep');
+      if (typeof esNativo === 'function' && esNativo()) return loginGoogleNativo();   // dentro de la app el ingreso se hace por el navegador del celu
       const { error } = await _sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin } });
       if (error) mostrarToast(error.message);
     };
@@ -88,6 +101,7 @@
   function pRegistro() {
     R.rostro = null; R.dni = null;
     root().innerHTML = volver() + card(`
+      ${cartelApk(false)}
       <h2 class="text-xl font-black">Registro de repartidor</h2>
       <p class="text-xs text-slate-500">Revisamos tus datos antes de aprobarte. El DNI solo lo ve el administrador.</p>
       <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">Nombre completo</label><input id="g-nom" maxlength="80" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"></div>
@@ -191,12 +205,14 @@
     const p = R.perfil;
     root().innerHTML = volver() + `
       <div id="r-push"></div>
+      <div id="r-apk"></div>
       <div class="flex items-center gap-3 mb-3"><img src="${esc(SUPABASE_URL)}/storage/v1/object/public/ne-rostros/${encodeURI(p.rostro_path || '')}?t=${Date.now() % 100000}" class="w-12 h-12 rounded-2xl object-cover bg-slate-100 border border-brand-200" alt="">
       <div class="flex-1 min-w-0"><p class="font-black text-slate-900 truncate">${esc(p.nombre)}</p><p id="r-badge" class="text-[11px] font-bold"></p></div></div>
       <div class="flex gap-1.5 mb-3">${['pedidos:Pedidos', 'horarios:Ajustes', 'zonas:Zonas y precios', 'historial:Ganancias'].map(t => { const [k, l] = t.split(':'); return `<button data-tab="${k}" type="button" class="flex-1 text-[11px] font-black rounded-xl py-2 ${R.tab === k ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}">${l}</button>`; }).join('')}</div>
       <div id="r-cont"></div>`;
     root().querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.tab = b.dataset.tab; pPanel(); });
     ico();
+    if (!localStorage.getItem('ne_apk_no') && $('r-apk')) { $('r-apk').innerHTML = cartelApk(true); if ($('apk-no')) $('apk-no').onclick = () => { localStorage.setItem('ne_apk_no', '1'); $('r-apk').innerHTML = ''; }; }
     R.pushEst = null; pintarPush().then(est => { if (est && est !== 'ok' && !R.pushModalVisto) { R.pushModalVisto = true; modalPush(est); } });
     $('r-badge').textContent = p.comparte_ubicacion ? '📍 Seguimiento en vivo activado' : ''; $('r-badge').className = 'text-[11px] font-bold text-brand-600';
     clearInterval(R.seg); R.seg = setInterval(revisarSeguimiento, 15000); revisarSeguimiento();
