@@ -381,7 +381,7 @@ const timD = { r:null, e:null };
 let ultimoCampo = 'r', guardadas = [];
 const SUF_APROX = ' (ubicación aproximada)';
 const dirFinal = k => D[k].dir;
-function dirTexto(k){ const t = $('in-' + k).value.trim(), p = parseDir(t); return ((p && p.altura) ? p.texto : t).slice(0, 150); }
+function dirTexto(k){ const t = $('in-' + k).value.trim(), e = ZC.texto(t), p = parseDir(t); return (e || ((p && p.altura) ? p.texto : t)).slice(0, 150); }   // e = texto prolijo para diagonal / pasaje
 function setEstD(k, t, msg, dbg){ estD[k] = { t, msg, dbg }; pintarZonaDir(k); }
 const DEBUG = new URLSearchParams(location.search).has('debug');   // ?debug=1 muestra la zona calculada (solo para probar)
 function pintarZonaDir(k){

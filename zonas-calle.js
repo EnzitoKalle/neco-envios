@@ -11,13 +11,22 @@
     if (/ribera|r[ií]o/i.test(t)) return { rio: true };
     if (/brown/i.test(t)) return { brown: true };
     if (/lober[ií]a/i.test(t)) { const n = t.match(/\d+/g); return n ? { calle: 578, bis: false, h: +n[n.length - 1] } : null; }
+    // Pasaje San Martín (pasaje, pje, psje…): siempre Centro
+    if (/\b(?:pasaje|pasaj|pje|psje|psj|pas)\b\.?\s*(?:san|sn|s)\b\.?\s*mart[ií]n/i.test(t)) { const n = t.match(/(\d{1,5})(?!.*\d)/); return { pasajeSM: true, h: n ? +n[1] : null }; }
+    // Diagonal San Martín (diagonal, diag, dia, d… + «san martín» o solo el número): cuenta como calle impar
+    const SM = '(?:(?:san|sn|s)\\.?\\s*mart[ií]n\\.?)', NUM = '[\\s,.\\-–]*(?:n[°º]|nro\\.?|numero|número|altura)?[\\s,.\\-–]*(\\d{1,5})(?!\\d)';
+    const dm = t.match(new RegExp('\\b(?:diagonal|diag|dia|dgl|dig)\\b\\.?\\s*' + SM + '?' + NUM, 'i')) || t.match(new RegExp('\\bd\\b\\.?\\s*' + SM + NUM, 'i'));
+    if (dm) return { diag: true, h: +dm[1] };
+    // «pasaje 1», «pasaje 2»…: se ignora, solo importan la calle y la altura
+    const sinPasaje = t.replace(/\b(?:pasaje|pasaj|pje|psje|psj)\b\.?\s*(?:n[°º]|nro\.?)?\s*\d+(?!\d)/gi, ' ');
+    const limpio = sinPasaje !== t;
     // Saca palabras de relleno: «calle», «av.», «n°», «nro», «altura», «al»
-    const s = t.replace(/\b(calle|avenida|av|diagonal|diag)\b\.?/gi, ' ')
+    const s = sinPasaje.replace(/\b(calle|avenida|av|diagonal|diag)\b\.?/gi, ' ')
                .replace(/\b(n[°º]|nro\.?|numero|número|altura|al)\s*/gi, ' ')
                .replace(/[#°º]/g, ' ');
     const m = s.match(/(?<!\d)(\d{1,3})(?!\d)\s*(bis)?[\s,.\-–]*(\d{1,5})(?!\d)/i);
     if (!m) return null;
-    return { calle: +m[1], bis: !!m[2], h: +m[3] };
+    return { calle: +m[1], bis: !!m[2], h: +m[3], limpio };
   }
 
   function posicion(a) {
@@ -60,6 +69,12 @@
     const a = leer(t); if (!a) return null;
     if (a.rio) return { zona: HOSPITAL, key: 'hospital', fuera: false, txt: 'Dice «ribera» o «río»' };
     if (a.brown) return { zona: 'Zona Intermedia Quequén', key: 'intermedia-quequen', fuera: false, txt: 'Av. Almirante Brown: siempre zona intermedia' };
+    if (a.pasajeSM) return { zona: 'Centro', key: 'centro', fuera: false, txt: 'Pasaje San Martín: siempre Centro' };
+    if (a.diag) {
+      const h = a.h, key = (h >= 800 && h <= 1700) ? 'centro' : (h >= 100 && h <= 799) ? 'playa-necochea' : null, z = key && porKey(key);
+      const p = posicion({ calle: 1, bis: false, h }), ent = h >= 200 ? 'entre ' + p.entre[0] + ' y ' + p.entre[1] : undefined;
+      return { zona: z ? z.n : FUERA, key, fuera: !z, ent, txt: 'Diagonal San Martín (cuenta como calle impar), altura ' + h + (ent ? ': la cuadra queda ' + ent : '') };
+    }
     const q = a.calle >= 500, p = posicion(a), z = zonaDe(a, p, q ? ZONAS_Q : ZONAS);
     const txt = 'Calle ' + a.calle + (a.bis ? ' bis' : '') + (p.par ? ' (par)' : ' (impar)') + ', altura ' + a.h + ': la cuadra queda entre la ' + p.entre[0] + ' y la ' + p.entre[1];
     return { zona: z ? z.n : FUERA, key: z ? z.key : null, fuera: !z, ent: 'entre ' + p.entre[0] + ' y ' + p.entre[1], txt };
@@ -81,6 +96,15 @@
     return hit ? hit.key : null;
   }
 
-  root.ZonasCalle = { FUERA, leer, posicion, calcular, idDeZona, keyDeId, ZONAS, ZONAS_Q };
+  // Texto prolijo para guardar cuando la dirección tiene algo especial (diagonal, pasaje…); null = usar el texto normal
+  function texto(t) {
+    const a = leer(t); if (!a) return null;
+    if (a.diag) return 'Diagonal San Martín ' + a.h;
+    if (a.pasajeSM) return 'Pasaje San Martín' + (a.h ? ' ' + a.h : '');
+    if (a.limpio && a.calle) return 'Calle ' + a.calle + (a.bis ? ' bis' : '') + ' ' + a.h;
+    return null;
+  }
+
+  root.ZonasCalle = { FUERA, leer, posicion, calcular, texto, idDeZona, keyDeId, ZONAS, ZONAS_Q };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.ZonasCalle;
 })(typeof window !== 'undefined' ? window : globalThis);

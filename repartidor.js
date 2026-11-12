@@ -4,7 +4,7 @@
               rostro:null, dni:null, stream:null, deferred:null, mapa:null, activos:0 };
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); R.deferred = e; });
   const root = () => $('v-repartidor');
-  const esApp = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const esApp = () => (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const card = h => `<div class="clean-card rounded-3xl p-5 space-y-3">${h}</div>`;
   const btn = (id, txt, cls) => `<button id="${id}" type="button" class="${cls || 'w-full bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-sm rounded-2xl py-3.5 shadow-md active:scale-[.98]'}">${txt}</button>`;
@@ -37,6 +37,8 @@
       <div class="text-center"><div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-400 text-white flex items-center justify-center text-2xl font-black shadow-md">N</div>
       <h2 class="text-xl font-black mt-3">Instalá la app de repartidores</h2>
       <p class="text-xs text-slate-500 mt-1">Con la app instalada recibís avisos de nuevos pedidos y funciona más rápido.</p></div>
+      ${!esIOS ? `<a href="/descargas/NecoEnvios-Repartidor.apk" download class="block w-full text-center bg-gradient-to-r from-brand-700 to-brand-500 text-white font-black text-base rounded-2xl py-4 shadow-md active:scale-[.98]">📲 DESCARGAR LA APP (Android)</a>
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-800 space-y-1"><b>Cómo instalarla:</b><p>1. Tocá el botón verde y esperá que se descargue.</p><p>2. Abrí el archivo descargado. Si el celu te avisa, tocá <b>Configuración</b> y activá <b>Permitir desde esta fuente</b>.</p><p>3. Si aparece un aviso de Play Protect, tocá <b>Más detalles → Instalar de todas formas</b>.</p><p>4. Abrí NecoEnvíos y entrá con tu cuenta de Google.</p></div>` : ''}
       ${R.deferred ? btn('i-inst', 'Instalar app') : ''}
       ${esIOS ? `<div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 text-xs text-brand-700 space-y-1"><b>En iPhone:</b><p>1. Abrí esta página en <b>Safari</b>.</p><p>2. Tocá el botón <b>Compartir</b> (cuadrado con flecha).</p><p>3. Elegí <b>"Agregar a pantalla de inicio"</b>.</p><p>4. Abrí la app desde el ícono nuevo.</p></div>`
         : (!R.deferred ? `<div class="bg-brand-50 border border-brand-200 rounded-2xl p-3 text-xs text-brand-700"><b>En Android:</b> tocá los 3 puntitos de Chrome y elegí <b>"Instalar app"</b> o <b>"Agregar a pantalla de inicio"</b>.</div>` : '')}
@@ -202,11 +204,7 @@
   }
 
   /* ---------- AVISOS: cartel grande hasta que se activen las notificaciones ---------- */
-  const AYUDA_PUSH = {
-    bloqueado: 'Las bloqueaste. Para activarlas: tocá el candado 🔒 (o los 3 puntitos ⋮) de la barra del navegador → Permisos o Configuración del sitio → Notificaciones → Permitir. Después tocá «Revisar».',
-    'ios-instalar': 'En iPhone primero instalá la app: tocá Compartir (cuadrado con flecha) → «Agregar a pantalla de inicio». Abrila desde el ícono y activá las notificaciones ahí.',
-    'no-soportado': 'Este navegador no permite avisos. Instalá la app o abrí NecoEnvíos con Chrome.'
-  };
+  const AYUDA_PUSH = new Proxy({}, { get: (t, k) => (window.NecoPush && window.NecoPush.ayuda[k]) || '' });   // textos compartidos con push.js
   function cerrarModalPush() { const m = $('modal-push'); if (m) m.remove(); }
   function modalPush(est) {
     cerrarModalPush();

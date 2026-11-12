@@ -1,5 +1,5 @@
 /* NECO ENVÍOS - Service worker. Sube el número de VERSION cuando cambies archivos. */
-const VERSION = 'ne-v14';
+const VERSION = 'ne-v15';
 const SHELL = ['/', '/index.html', '/zonas-calle.js', '/repartidor.js', '/admin.js', '/push.js', '/manifest.json', '/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL).catch(() => {}))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
@@ -8,7 +8,7 @@ self.addEventListener('activate', e => {
 // Red primero (siempre lo más nuevo); si no hay internet, usa lo guardado. Solo archivos propios.
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.origin !== location.origin) return;
+  if (e.request.method !== 'GET' || u.origin !== location.origin || u.pathname.startsWith('/descargas/')) return;   // la descarga de la app no se guarda en caché
   e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(VERSION).then(c => c.put(e.request, cp)); return r; })
     .catch(() => caches.match(e.request).then(r => r || caches.match('/index.html'))));
 });
