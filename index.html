@@ -119,11 +119,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
         <label for="in-r" class="text-sm font-black text-slate-800">📍 ¿Dónde retiramos?</label>
         <input id="in-r" maxlength="150" autocomplete="off" enterkeyhint="next" class="clean-input w-full rounded-xl px-3 py-3 text-sm mt-1" placeholder="Calle y altura. Ej: 70 bis 3722">
         <div id="zona-r" class="mt-1"></div>
+        <input id="det-r" maxlength="150" autocomplete="off" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Detalles (opcional): piso, depto, interno, no tengo timbre…">
       </div>
       <div>
         <label for="in-e" class="text-sm font-black text-slate-800">🏁 ¿Dónde entregamos?</label>
         <input id="in-e" maxlength="150" autocomplete="off" enterkeyhint="done" class="clean-input w-full rounded-xl px-3 py-3 text-sm mt-1" placeholder="Calle y altura. Ej: 62 2150">
         <div id="zona-e" class="mt-1"></div>
+        <input id="det-e" maxlength="150" autocomplete="off" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1" placeholder="Detalles (opcional): piso, depto, interno, no tengo timbre…">
       </div>
       <p class="text-[11px] text-slate-400">Escribí la calle y la altura como se dice acá, por ejemplo «70 bis 3722». Con eso alcanza, nosotros ubicamos la zona.</p>
     </div>
@@ -147,10 +149,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fbf8f2;color:#1e293b
           <p class="text-[11px] text-slate-500">Le pagás directo al repartidor que elijas. Estos filtros muestran solo a los que se ajustan a vos.</p></div>
         <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cómo querés pagar el envío?</label>
           <select id="f-met" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="efectivo">💵 Efectivo</option><option value="transferencia">🏦 Transferencia</option></select></div>
-        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Quién abona el envío?</label>
-          <select id="f-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="entrega">El cliente (en el destino)</option><option value="retiro">Yo (cuando retira el paquete)</option></select></div>
-        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿El repartidor debe pagar el producto por adelantado?</label>
-          <select id="f-adel" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="si">🛒 Sí, paga cuando retira y se lo devuelven cuando lo entrega.</option></select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Cuándo pagás el envío?</label>
+          <select id="f-mom" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="entrega">📦 Al recibir (en destino)</option><option value="retiro">Al retirar</option></select></div>
+        <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿El repartidor paga tu compra en el comercio?</label>
+          <select id="f-adel" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="si">🛒 Sí, que la pague él y yo se la devuelvo</option></select></div>
         <div><label class="text-[11px] font-extrabold text-slate-500 uppercase">¿Qué vehículo necesitás?</label>
           <select id="f-veh" class="clean-input w-full rounded-xl px-3 py-2.5 text-sm mt-1"><option value="todos">Cualquiera</option><option value="moto">🏍️ Moto</option><option value="auto">🚗 Auto (paquetes grandes o frágiles)</option><option value="bici">🚲 Bici</option></select></div>
       </div>
@@ -381,6 +383,7 @@ const timD = { r:null, e:null };
 let ultimoCampo = 'r', guardadas = [];
 const SUF_APROX = ' (ubicación aproximada)';
 const dirFinal = k => D[k].dir;
+const detHtml = d => d ? '<p class="text-xs font-bold text-amber-700">📝 ' + esc(d) + '</p>' : '';   // detalle del pedido (piso, depto, timbre…)
 function dirTexto(k){ const t = $('in-' + k).value.trim(), e = ZC.texto(t), p = parseDir(t); return (e || ((p && p.altura) ? p.texto : t)).slice(0, 150); }   // e = texto prolijo para diagonal / pasaje
 function setEstD(k, t, msg, dbg){ estD[k] = { t, msg, dbg }; pintarZonaDir(k); }
 const DEBUG = new URLSearchParams(location.search).has('debug');   // ?debug=1 muestra la zona calculada (solo para probar)
@@ -621,6 +624,7 @@ $('conf-ok').addEventListener('click', async () => {
       p_rep: r.repartidor_id, p_nombre: $('c-nombre').value.trim(), p_whatsapp: $('c-wsp').value.trim(), p_comercio: comercioParam,
       r_dir: dirFinal('r'), r_lat: D.r.lat, r_lng: D.r.lng, e_dir: dirFinal('e'), e_lat: D.e.lat, e_lng: D.e.lng,
       p_zona_retiro: D.r.zid, p_zona_entrega: D.e.zid,
+      p_retiro_detalle: ($('det-r').value.trim().slice(0, 150) || null), p_entrega_detalle: ($('det-e').value.trim().slice(0, 150) || null),
       p_metodo: conf.metodo, p_momento: conf.momento, p_adelanto: (F.adel && r.adelanta) ? 1 : 0 });
     if (error) throw error; id = data;
   } catch (e) {
@@ -741,7 +745,7 @@ async function refrescarPedido(){
   const { data } = await _sb.from('ne_pedidos').select('*').eq('id', chatId).single();
   if (!data) return; const antes = (chatPedido && chatPedido.id === data.id) ? chatPedido.estado : null; chatPedido = data;
   $('ch-estado').textContent = ((sesion && data.cliente_id === sesion.user.id ? ESTADOS_CLI : ESTADOS)[data.estado]) || data.estado;
-  $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(fixDir(data.retiro_dir))}</p><p>🏁 Entrega: ${esc(fixDir(data.entrega_dir))}</p>${resumenPago(data, sesion && data.cliente_id === sesion.user.id)}${sesion && data.cliente_id === sesion.user.id ? (data.estado === 'solicitado' ? '<p>ℹ️ Podés cancelar hasta que el repartidor acepte.</p>' : ABIERTOS.includes(data.estado) ? '<p>ℹ️ Pedido aceptado: ya no se puede cancelar.</p>' : '') : ''}`;
+  $('ch-info').innerHTML = `<p>📍 Retiro: ${esc(fixDir(data.retiro_dir))}</p>${detHtml(data.retiro_detalle)}<p>🏁 Entrega: ${esc(fixDir(data.entrega_dir))}</p>${detHtml(data.entrega_detalle)}${resumenPago(data, sesion && data.cliente_id === sesion.user.id)}${sesion && data.cliente_id === sesion.user.id ? (data.estado === 'solicitado' ? '<p>ℹ️ Podés cancelar hasta que el repartidor acepte.</p>' : ABIERTOS.includes(data.estado) ? '<p>ℹ️ Pedido aceptado: ya no se puede cancelar.</p>' : '') : ''}`;
   const ac = $('ch-acciones'); ac.innerHTML = '';
   const esCli = sesion && data.cliente_id === sesion.user.id;
   const idxPaso = PASOS.findIndex(x => x[0] === data.estado);
@@ -809,13 +813,14 @@ async function repetirPedido(p){
   [['r', p.retiro_dir, p.retiro_lat, p.retiro_lng], ['e', p.entrega_dir, p.entrega_lat, p.entrega_lng]].forEach(([k, dir, la, lo]) => {
     fijarDir(k, String(dir || ''), Number(la), Number(lo));
   });
+  $('det-r').value = p.retiro_detalle || ''; $('det-e').value = p.entrega_detalle || '';
   limpiarLista();
   mostrarToast('Listo, cargamos tu pedido anterior 💚 Ahora tocá «Ver repartidores disponibles».');
 }
 async function abrirMisPedidos(){
   abrirModal('modal-pedidos'); const box = $('lista-pedidos'); box.innerHTML = '<p class="text-xs text-slate-400">Cargando...</p>';
   try { await asegurarSesion(); } catch(e){ return; }
-  const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,retiro_dir,entrega_dir,creado,retiro_lat,retiro_lng,entrega_lat,entrega_lng,pago_envio_metodo,pago_envio_momento,adelanto_monto,comercio').eq('cliente_id', sesion.user.id).order('creado', { ascending:false }).limit(30);
+  const { data, error } = await _sb.from('ne_pedidos').select('id,estado,precio,retiro_dir,entrega_dir,creado,retiro_lat,retiro_lng,entrega_lat,entrega_lng,pago_envio_metodo,pago_envio_momento,adelanto_monto,comercio,retiro_detalle,entrega_detalle').eq('cliente_id', sesion.user.id).order('creado', { ascending:false }).limit(30);
   if (error) { box.textContent = 'Error al cargar'; return; }
   if (!data.length) { box.innerHTML = '<p class="text-sm text-slate-500 text-center py-4">Todavía no hiciste pedidos. ¡Pedí el primero! 🏍️</p>'; return; }
   box.innerHTML = '';

@@ -6,9 +6,22 @@
   const HOSPITAL = 'Zona Hospital, 9 de Julio y río';
 
   // Cada dirección se convierte en: calle, bis y altura
+  // Lugares que se conocen por su nombre y no por su dirección. Para agregar uno: sumá una línea con una palabra y la zona.
+  // Zonas: playa-necochea, centro, hospital, villa-deportista, playa-quequen, intermedia-quequen, centro-quequen
+  const LUGARES = [
+    // Hospitales (las variantes más comunes de cómo los escribe la gente)
+    { re: /\biru+r?z[uú]n\b|\bhosp(?:ital|\.)?\s+(?:de\s+)?quequ[eé]n\b/i, key: 'centro-quequen', n: 'Hospital Irurzun' },
+    { re: /\bfer+e[iy]ra\b|\bhosp(?:ital|\.)?\s+(?:municipal|(?:de\s+)?necochea)\b/i, key: 'hospital', n: 'Hospital Andrés Ferreyra' },
+    // Ribera del río
+    { re: /\bri[bv]era\b|\br[ií]o\b/i, key: 'hospital', n: 'Ribera del río' },
+    // Casino y Termoeléctrica
+    { re: /\bcasino\b/i, key: 'playa-necochea', n: 'Casino' },
+    { re: /termo\s*el[eé]ctrica/i, key: 'playa-necochea', n: 'Termoeléctrica' }
+  ];
+
   function leer(t) {
     t = String(t || '');
-    if (/ribera|r[ií]o/i.test(t)) return { rio: true };
+    const lug = LUGARES.find(l => l.re.test(t)); if (lug) return { lugar: lug };
     if (/brown/i.test(t)) return { brown: true };
     if (/lober[ií]a/i.test(t)) { const n = t.match(/\d+/g); return n ? { calle: 578, bis: false, h: +n[n.length - 1] } : null; }
     // Pasaje San Martín (pasaje, pje, psje…): siempre Centro
@@ -67,7 +80,7 @@
   // Devuelve null si no se puede leer; si se lee: { zona, key, fuera, ent, txt }
   function calcular(t) {
     const a = leer(t); if (!a) return null;
-    if (a.rio) return { zona: HOSPITAL, key: 'hospital', fuera: false, txt: 'Dice «ribera» o «río»' };
+    if (a.lugar) { const z = porKey(a.lugar.key); return { zona: z.n, key: z.key, fuera: false, txt: 'Lugar conocido: ' + a.lugar.n }; }
     if (a.brown) return { zona: 'Zona Intermedia Quequén', key: 'intermedia-quequen', fuera: false, txt: 'Av. Almirante Brown: siempre zona intermedia' };
     if (a.pasajeSM) return { zona: 'Centro', key: 'centro', fuera: false, txt: 'Pasaje San Martín: siempre Centro' };
     if (a.diag) {
@@ -105,6 +118,6 @@
     return null;
   }
 
-  root.ZonasCalle = { FUERA, leer, posicion, calcular, texto, idDeZona, keyDeId, ZONAS, ZONAS_Q };
+  root.ZonasCalle = { FUERA, LUGARES, leer, posicion, calcular, texto, idDeZona, keyDeId, ZONAS, ZONAS_Q };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.ZonasCalle;
 })(typeof window !== 'undefined' ? window : globalThis);
